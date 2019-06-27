@@ -1,11 +1,12 @@
 import socket
+import json
 import cv2 as cv
 from cv_bridge import CvBridge
 import numpy as np
 import rospy
 from sensor_msgs.msg import Image
 
-from common import send
+from common import send, SERVER
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(SERVER)
@@ -22,13 +23,13 @@ dataInfo = {
 
 def onData(imgMsg):
   img = bridge.imgmsg_to_cv2(imgMsg, 'bgr8')
-  jpgImg = cv.imencode('.jpg', frame)[1]
+  jpgImg = cv.imencode('.jpg', img)[1]
   data = np.array(jpgImg)
   
-  send(s, info, data, 'array')
+  send(s, dataInfo, data, 'array')
   
-  info['sequence'] += 1
-  info['timestamp'] += 1
+  dataInfo['sequence'] += 1
+  dataInfo['timestamp'] += 1
 
 if __name__ == "__main__":
   
@@ -47,7 +48,7 @@ if __name__ == "__main__":
   send(s, info, data, 'string')
 
   rospy.init_node('vizVideoSender', anonymous=True)
-  rospy.Subscriber('usb_cam_image_raw', Image, onData)
+  rospy.Subscriber('detected_image_rviz', Image, onData)
   rospy.spin()
 
   s.close()

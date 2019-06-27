@@ -381,7 +381,7 @@ void CardDetection::publishVslam(vslam::Viz &viz)
     vslam::Camera camera;
     vslam::Card card;
     camera.camera_pose = m_CurrentPose;
-    viz.cameras.push_back(camera);
+    viz.camera = camera;
     for(int i =0;i <mMap.mMapPoints.size();i++)
     {
         card.card_pose.position.x = mMap.mMapPoints.at(i).mWorldPositionPoint.x;
@@ -390,8 +390,9 @@ void CardDetection::publishVslam(vslam::Viz &viz)
         card.code_id = mMap.mMapPoints.at(i).mCard.code_id;
         card.card_id = i;
         viz.cards.push_back(card);
-        pub_slam.publish(viz);
-    }
+    }        
+    pub_slam.publish(viz);
+
 }
 
 
@@ -436,7 +437,13 @@ void CardDetection::MainLoop()
                 ROS_INFO_STREAM("carmera:" << map_points.at(i).mCameraPositionPoint);
 
                 cv::Point3d cv_point;
-                if (mMap.mMapPoints.size() % 2 == 0)
+                if (mMap.mMapPoints.size() == 0)
+                {
+                    cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
+                    cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() - 4.0;
+                    cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
+                }
+                else if (mMap.mMapPoints.size() % 2 == 0)
                 {
                     cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
                     cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() + 4.0;

@@ -13,6 +13,7 @@ set (CMAKE_CXX_FLAGS "-std=c++11")
 
 find_package(catkin REQUIRED COMPONENTS
     roscpp
+    rospy
     sensor_msgs
     nav_msgs
     cv_bridge

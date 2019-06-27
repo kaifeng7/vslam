@@ -1,3 +1,3 @@
 Header header
-Camera[] cameras
+Camera camera
 Card[] cards

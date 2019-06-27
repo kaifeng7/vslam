@@ -5,7 +5,7 @@ import numpy as np
 import rospy
 from vslam.msg import Viz
 
-from common import send
+from common import send, SERVER
   
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(SERVER)
@@ -24,14 +24,13 @@ def onData(msg):
     'observers': [],
     'marks': []
   }
-  for data in msg.cameras:
-    jsonData['observers'].append({
-      'location': {
-        'x': data.camera_pose.position.x, 
-        'y': data.camera_pose.position.y, 
-        'z': data.camera_pose.position.z
-      }
-    })
+  jsonData['observers'].append({
+    'location': {
+      'x': msg.camera.camera_pose.position.x, 
+      'y': msg.camera.camera_pose.position.y, 
+      'z': msg.camera.camera_pose.position.z
+    }
+  })
   for data in msg.cards:
     jsonData['marks'].append({
       'id': data.card_id,
@@ -42,15 +41,15 @@ def onData(msg):
         'z': data.card_pose.position.z
       }
     })
-  send(s, info, json.dumps(jsonData), 'string')
+  send(s, dataInfo, json.dumps(jsonData), 'string')
 
-  info['sequence'] += 1
-  info['timestamp'] += 1
+  dataInfo['sequence'] += 1
+  dataInfo['timestamp'] += 1
 
 if __name__ == "__main__":
 
   rospy.init_node('vizMarkSender', anonymous=True)
-  rospy.Subscriber('vlam_viz', Viz, onData)
+  rospy.Subscriber('slam_viz', Viz, onData)
   rospy.spin()
 
   s.close()
