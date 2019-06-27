@@ -26,7 +26,7 @@ struct Card
 struct Image
 {
     std::vector<Card> card;
-    cv::Mat pose;
+    Eigen::Matrix<double,3,4> pose;
     int image_id;
     Camera mCamera;
 };

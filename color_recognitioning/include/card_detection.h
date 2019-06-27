@@ -20,7 +20,6 @@
 #include <opencv2/opencv.hpp>
 #include <tf/tf.h>
 
-
 #include "map.h"
 
 class MapPoint;
@@ -63,6 +62,7 @@ class CardDetection
         cv::Mat m_CurrentImageMat;
         Image m_CurrentImage;
         Image m_LastImage;
+        geometry_msgs::Pose m_CurrentPose;
 
         KeyFrame m_CurrentKeyFrame;
         KeyFrame m_RefKeyFrame;
