@@ -8,10 +8,12 @@
 #define KEY_FRAME_H
 
 #include <opencv2/opencv.hpp>
-#include "map_point.h"
 #include "card.h"
+#include "map_point.h"
+
 
 class MapPoint;
+class Image;
 class KeyFrame
 {
 

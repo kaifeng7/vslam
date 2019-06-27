@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf
 )
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV 3 REQUIRED)
 
 find_package(Sophus REQUIRED)
 

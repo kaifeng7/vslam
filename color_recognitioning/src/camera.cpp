@@ -22,21 +22,20 @@ Camera::~Camera()
 }
 
 cv::Mat Camera::setK(const double &fx,const double &fy,const double &cx,const double &cy)
-{
-    mK = (cv::Mat_<double>(3,3)<<fx,0, cx,
-                                 0, fy,cy,
-                                 0, 0, 1);
-    
+{    
+    return(cv::Mat_<double>(3,3)<<fx,0, cx,
+                                  0, fy,cy,
+                                  0, 0, 1);
 }
 
-Eigen::Vector3d Camera::world2camera(const Eigen::Vector3d &point_in_world,const Sophus::SE3d &Twc)
+Eigen::Vector3d Camera::world2camera(const Eigen::Vector3d &point_in_world)
 {
-    return Twc.inverse() * point_in_world;
+    return mTwc.inverse() * point_in_world;
 }
 
-Eigen::Vector3d Camera::camera2world(const Eigen::Vector3d &point_in_camera,const Sophus::SE3d &Twc)
+Eigen::Vector3d Camera::camera2world(const Eigen::Vector3d &point_in_camera)
 {
-    return Twc * point_in_camera; 
+    return mTwc * point_in_camera; 
 }
 
 Eigen::Vector2d Camera::camera2pixel(const Eigen::Vector3d &point_in_camera)

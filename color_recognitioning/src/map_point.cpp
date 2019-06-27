@@ -16,3 +16,9 @@ MapPoint::MapPoint(const Card &card,const cv::Mat &world_position)
     mCard = card;
     mWorldPositionMat = world_position;
 }
+
+
+MapPoint::~MapPoint()
+{
+
+}

@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:32 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-06-25 22:38:52
+ * @Last Modified time: 2019-06-26 22:33:26
  */
 
 #ifndef CARD_DETECTION_H
@@ -16,22 +16,27 @@
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/opencv.hpp>
 #include <tf/tf.h>
 
 
-#include "camera.h"
-#include "card.h"
 #include "map.h"
 
 class MapPoint;
 class KeyFrame;
 class SlamMap;
+class Image;
+class Card;
 
 struct DetectionParam
 {
     double max_area;
     double min_area;
+    double fx;
+    double fy;
+    double cx;
+    double cy;
 
 };
 
@@ -53,10 +58,14 @@ class CardDetection
 
         bool bImage;
         bool bOdom;
+        bool bInit;//初始化
 
         cv::Mat m_CurrentImageMat;
         Image m_CurrentImage;
         Image m_LastImage;
+
+        KeyFrame m_CurrentKeyFrame;
+        KeyFrame m_RefKeyFrame;
         
         int m_CountImageId;
         int m_CountKeyFrameId;

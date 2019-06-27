@@ -9,14 +9,16 @@
 #include <opencv2/opencv.hpp>
 
 #include "card.h"
-#include "key_frame.h"
+
 class KeyFrame;
+class Card;
 class MapPoint
 {
 
 public:
     MapPoint();
     MapPoint(const Card &card,const cv::Mat &world_position);
+    ~MapPoint();
 
     //void addKeyFrame(const KeyFrame &keyframe);
 
