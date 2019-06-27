@@ -19,6 +19,7 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/opencv.hpp>
 #include <tf/tf.h>
+#include <vslam/Viz.h>
 
 #include "map.h"
 
@@ -54,6 +55,7 @@ class CardDetection
         ros::Publisher pub_MarkerRviz;
         ros::Publisher pub_DetectedImageRviz;
         ros::Publisher pub_CardRviz;
+        ros::Publisher pub_slam;
 
         bool bImage;
         bool bOdom;
@@ -77,6 +79,7 @@ class CardDetection
         void callbackGetOdom(const nav_msgs::OdometryConstPtr &msg);
         void triangulation(const Image& image1,const Image& image2,std::vector<MapPoint> &map_points);
         void VisCardInWorld(visualization_msgs::MarkerArray &markers);
+        void publishVslam(vslam::Viz &viz);
        
         void initROS();
         void MainLoop();

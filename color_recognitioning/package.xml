@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>color_recognitioning</name>
+  <name>vslam</name>
   <version>0.0.0</version>
-  <description>The color_recognitioning package</description>
+  <description>The vslam package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -27,6 +27,8 @@
   <build_depend>Opencv</build_depend>
   <build_depend>Sophus</build_depend>
   <build_depend>g2o</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
   
   <exec_depend>roscpp</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>  
@@ -35,6 +37,10 @@
   <exec_depend>tf</exec_depend>
   <exec_depend>Opencv</exec_depend>
   <exec_depend>g2o</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+
+
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

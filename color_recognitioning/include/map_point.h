@@ -28,6 +28,7 @@ public:
     cv::Point3d mWorldPositionPoint;
     cv::Point3d Normal;//normal of viewing direction
     
+    
     //观测到该点的KeyFrame
     //std::map<KeyFrame *,int> my_observation;
 

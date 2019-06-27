@@ -1,0 +1,2 @@
+geometry_msgs/Pose camera_pose
+int32 key_frame_id

@@ -7,11 +7,10 @@
 
 #include "card_detection.h"
 
-CardDetection::CardDetection() : pnh_("~"), bImage(false), bOdom(false),bInit(false),m_CountImageId(0), m_CountKeyFrameId(0)
+CardDetection::CardDetection() : pnh_("~"), bImage(false), bOdom(false), bInit(false), m_CountImageId(0), m_CountKeyFrameId(0)
 {
     initROS();
-    m_CurrentImage.mCamera = Camera(mParam.fx,mParam.fy,mParam.cx,mParam.cy);//初始化相机内参
-
+    m_CurrentImage.mCamera = Camera(mParam.fx, mParam.fy, mParam.cx, mParam.cy); //初始化相机内参
 }
 
 CardDetection::~CardDetection()
@@ -23,6 +22,7 @@ void CardDetection::initROS()
 
     pub_DetectedImageRviz = nh_.advertise<sensor_msgs::Image>("/detected_image_rviz", 1);
     pub_MarkerRviz = nh_.advertise<visualization_msgs::MarkerArray>("/marker_rviz", 10);
+    pub_slam = nh_.advertise<vslam::Viz>("/slam_viz",10);
 
     sub_Image = nh_.subscribe("/usb_cam/image_raw", 1, &CardDetection::callbackGetImage, this);
     sub_Odom = nh_.subscribe("/odom/imu", 10, &CardDetection::callbackGetOdom, this);
@@ -38,14 +38,12 @@ void CardDetection::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
 {
     bOdom = true;
     m_CurrentPose = msg->pose.pose;
-
-    
 }
 
 void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
 {
     cv_bridge::CvImagePtr cv_ptr;
-    cv_bridge::CvImagePtr pub_ptr;    
+    cv_bridge::CvImagePtr pub_ptr;
     try
     {
         bImage = true;
@@ -58,7 +56,7 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
         return;
     }
     m_CurrentImageMat = cv_ptr->image;
-    m_CurrentImage.mCamera = Camera(mParam.fx,mParam.fy,mParam.cx,mParam.cy);
+    m_CurrentImage.mCamera = Camera(mParam.fx, mParam.fy, mParam.cx, mParam.cy);
     Eigen::Quaterniond quat(m_CurrentPose.orientation.w, m_CurrentPose.orientation.x, m_CurrentPose.orientation.y, m_CurrentPose.orientation.z);
     Eigen::Vector3d t(m_CurrentPose.position.x, m_CurrentPose.position.y, m_CurrentPose.position.z);
     Sophus::SE3d se3(quat, t);
@@ -66,9 +64,11 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
 
     Eigen::Matrix3d r = quat.toRotationMatrix();
     m_CurrentImage.pose << r(0, 0), r(0, 1), r(0, 2), t(0, 0),
-                           r(1, 0), r(1, 1), r(1, 2), t(1, 0),
-                           r(2, 0), r(2, 1), r(2, 2), t(2, 0);
+        r(1, 0), r(1, 1), r(1, 2), t(1, 0),
+        r(2, 0), r(2, 1), r(2, 2), t(2, 0);
     m_CurrentImage.image_id = m_CountImageId++;
+    if (m_CurrentImage.image_id % 3 == 0)
+        return;
     cv::Mat imgHSV;
     cv::Mat imgPub;
     std::vector<cv::Mat> splitHSV;
@@ -109,7 +109,6 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
             rotated_rect = cv::minAreaRect(contours[i]);
             cv::Rect rect;
             rect = rotated_rect.boundingRect();
-
 
             if (rect.width >= rect.height)
                 continue;
@@ -213,7 +212,7 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
                         code_id.push_back('2');
                     }
 
-                //ROS_INFO_STREAM("count_blue:" << count_blue << "count_yellow:" << count_yellow << "count_non" << count_non);
+                    //ROS_INFO_STREAM("count_blue:" << count_blue << "count_yellow:" << count_yellow << "count_non" << count_non);
                 }
                 if (code_id == "1010101" || code_id == "0101010" || code_id == "0101000" ||
                     code_id == "0001010" || code_id == "0100010" || code_id == "0101110")
@@ -242,7 +241,7 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
             //cv::drawContours(m_CurrentImageMat,contours,i,cv::Scalar(0,0,255)); // 轮廓的颜色);
         }
     }
-    if(m_CurrentImage.card.size() > 0)
+    if (m_CurrentImage.card.size() > 0)
     {
         bInit = true;
         m_CurrentKeyFrame.mImage = m_CurrentImage;
@@ -257,13 +256,13 @@ void CardDetection::VisCardInWorld(visualization_msgs::MarkerArray &markers)
     std::vector<MapPoint> map_points = mMap.mMapPoints;
     visualization_msgs::Marker marker;
     ROS_INFO_STREAM(map_points.size());
-    for(int i =0;i<map_points.size();i++)
+    for (int i = 0; i < map_points.size(); i++)
     {
         geometry_msgs::Pose pose;
         // cv::Mat mat = map_points.at(i).mWorldPositionMat;
-        // Eigen::Matrix3d eigen;        
-        // eigen << mat.at<double>(0,0), mat.at<double>(0,1), mat.at<double>(0,2), 
-        //          mat.at<double>(1,0), mat.at<double>(1,1), mat.at<double>(1,2), 
+        // Eigen::Matrix3d eigen;
+        // eigen << mat.at<double>(0,0), mat.at<double>(0,1), mat.at<double>(0,2),
+        //          mat.at<double>(1,0), mat.at<double>(1,1), mat.at<double>(1,2),
         //          mat.at<double>(2,0), mat.at<double>(2,1), mat.at<double>(2,2);
 
         // pose.position.x = mat.at<double>(0,3);
@@ -302,8 +301,8 @@ void CardDetection::VisCardInWorld(visualization_msgs::MarkerArray &markers)
 }
 
 void CardDetection::triangulation(const Image &image1, const Image &image2, std::vector<MapPoint> &map_points)
-{   
-    /* 方法一：不准 
+{
+    /* 方法一：不准 */
     std::vector<cv::Point2d> points1, points2;
     for (int i = 0; i < image1.card.size(); i++)
     {
@@ -324,53 +323,83 @@ void CardDetection::triangulation(const Image &image1, const Image &image2, std:
         }
     }
     cv::Mat point_4d;
-    cv::triangulatePoints(image1.pose, image2.pose, cv::Mat(points1,true), cv::Mat(points2,true), point_4d);
+    cv::Mat pose1 = (cv::Mat_<double>(3, 4) << image1.pose(0, 0), image1.pose(0, 1), image1.pose(0, 2), image1.pose(0, 3),
+                     image1.pose(1, 0), image1.pose(1, 1), image1.pose(1, 2), image1.pose(1, 3),
+                     image1.pose(2, 0), image1.pose(2, 1), image1.pose(2, 2), image1.pose(2, 3));
 
-    for (int i = 0; i < point_4d.cols; i++)//转换非齐次坐标
+    cv::Mat pose2 = (cv::Mat_<double>(3, 4) << image2.pose(0, 0), image2.pose(0, 1), image2.pose(0, 2), image2.pose(0, 3),
+                     image2.pose(1, 0), image2.pose(1, 1), image2.pose(1, 2), image2.pose(1, 3),
+                     image2.pose(2, 0), image2.pose(2, 1), image2.pose(2, 2), image2.pose(2, 3));
+
+    cv::triangulatePoints(pose1, pose2, cv::Mat(points1, true), cv::Mat(points2, true), point_4d);
+
+    for (int i = 0; i < point_4d.cols; i++) //转换非齐次坐标
     {
         cv::Mat x = point_4d.col(i);
         x / x.at<double>(3, 0);
         cv::Point3d p(x.at<double>(0, 0), x.at<double>(1, 0), x.at<double>(2, 0));
         map_points.at(i).mCameraPositionPoint = p;
-        
-    }  */  
+    }
+
     //方法二：参考vis
-    for (int i = 0; i < image1.card.size(); i++)
+    // for (int i = 0; i < image1.card.size(); i++)
+    // {
+    //     for (int j = 0; j < image2.card.size(); j++)
+    //     {
+    //         if (image1.card.at(i).code_id == image2.card.at(j).code_id)
+    //         {
+    //             Eigen::Vector3d point_in_picture1, point_in_picture2; //图像坐标系下
+    //             point_in_picture1 = m_CurrentImage.mCamera.pixel2camera(Eigen::Vector2d(image1.card.at(i).center.pt.x, image1.card.at(i).center.pt.y), 1);
+    //             point_in_picture2 = m_CurrentImage.mCamera.pixel2camera(Eigen::Vector2d(image2.card.at(j).center.pt.x, image2.card.at(j).center.pt.y), 1);
+
+    //             Eigen::Vector2d point1, point2;
+    //             point1 = Eigen::Vector2d(point_in_picture1(0), point_in_picture1(1));
+    //             point2 = Eigen::Vector2d(point_in_picture2(0), point_in_picture2(1));
+    //             MapPoint map_point;
+    //             map_point.mCard = image2.card.at(j);
+    //             Eigen::Matrix4d design_matrix = Eigen::Matrix4d::Zero();
+    //             design_matrix.row(0) = point1[0] * image1.pose.row(2) - image1.pose.row(0);
+    //             design_matrix.row(1) = point1[1] * image1.pose.row(2) - image1.pose.row(1);
+    //             design_matrix.row(2) = point2[0] * image2.pose.row(2) - image2.pose.row(0);
+    //             design_matrix.row(3) = point2[1] * image2.pose.row(2) - image2.pose.row(1);
+    //             Eigen::Vector4d triangulated_point;
+    //             triangulated_point = design_matrix.jacobiSvd(Eigen::ComputeFullV).matrixV().rightCols<1>();
+    //             cv::Point3d point_3d(triangulated_point(0) / triangulated_point(3),
+    //                                  triangulated_point(1) / triangulated_point(3),
+    //                                  triangulated_point(2) / triangulated_point(3));
+    //             map_point.mCameraPositionPoint = point_3d;
+    //             map_points.push_back(map_point);
+    //         }
+    //     }
+    // }
+}
+
+void CardDetection::publishVslam(vslam::Viz &viz)
+{
+    viz.header.frame_id = "odom";
+    viz.header.stamp = ros::Time::now();
+    vslam::Camera camera;
+    vslam::Card card;
+    camera.camera_pose = m_CurrentPose;
+    viz.cameras.push_back(camera);
+    for(int i =0;i <mMap.mMapPoints.size();i++)
     {
-        for (int j = 0; j < image2.card.size(); j++)
-        {
-            if (image1.card.at(i).code_id == image2.card.at(j).code_id)
-            {
-                Eigen::Vector3d point_in_picture1, point_in_picture2; //图像坐标系下
-                point_in_picture1 = m_CurrentImage.mCamera.pixel2camera(Eigen::Vector2d(image1.card.at(i).center.pt.x, image1.card.at(i).center.pt.y), 1);
-                point_in_picture2 = m_CurrentImage.mCamera.pixel2camera(Eigen::Vector2d(image2.card.at(j).center.pt.x, image2.card.at(j).center.pt.y), 1);
-                
-                Eigen::Vector2d point1, point2;
-                point1 = Eigen::Vector2d(point_in_picture1(0), point_in_picture1(1));
-                point2 = Eigen::Vector2d(point_in_picture2(0), point_in_picture2(1));
-                MapPoint map_point;
-                map_point.mCard = image2.card.at(j);
-                Eigen::Matrix4d design_matrix = Eigen::Matrix4d::Zero();
-                design_matrix.row(0) = point1[0] * image1.pose.row(2) - image1.pose.row(0);
-                design_matrix.row(1) = point1[1] * image1.pose.row(2) - image1.pose.row(1);
-                design_matrix.row(2) = point2[0] * image2.pose.row(2) - image2.pose.row(0);
-                design_matrix.row(3) = point2[1] * image2.pose.row(2) - image2.pose.row(1);
-                Eigen::Vector4d triangulated_point;
-                triangulated_point = design_matrix.jacobiSvd(Eigen::ComputeFullV).matrixV().rightCols<1>();
-                cv::Point3d point_3d(triangulated_point(0) / triangulated_point(3),
-                                     triangulated_point(1) / triangulated_point(3),
-                                     triangulated_point(2) / triangulated_point(3));
-                map_point.mCameraPositionPoint = point_3d;                
-                map_points.push_back(map_point);
-            }
-        }
+        card.card_pose.position.x = mMap.mMapPoints.at(i).mWorldPositionPoint.x;
+        card.card_pose.position.y = mMap.mMapPoints.at(i).mWorldPositionPoint.y;
+        card.card_pose.position.z = mMap.mMapPoints.at(i).mWorldPositionPoint.z;
+        card.code_id = mMap.mMapPoints.at(i).mCard.code_id;
+        card.card_id = i;
+        viz.cards.push_back(card);
+        pub_slam.publish(viz);
     }
 }
+
 
 void CardDetection::MainLoop()
 {
     ROS_INFO_STREAM("card_detection start");
     ros::Rate loop_rate(5);
+    vslam::Viz viz;
 
     while (ros::ok())
     {
@@ -388,61 +417,67 @@ void CardDetection::MainLoop()
             continue;
         }
 
-        if(bInit && m_CurrentKeyFrame.mKeyFrameId == 0)
+        if (bInit && m_CurrentKeyFrame.mKeyFrameId == 0)
         {
             m_RefKeyFrame = m_CurrentKeyFrame;
         }
-        else if(bInit)
+        else if (bInit)
         {
             std::vector<MapPoint> map_points;
             m_RefKeyFrame = m_CurrentKeyFrame;
-            triangulation(m_RefKeyFrame.mImage,m_CurrentKeyFrame.mImage,map_points);
-            for(int i=0;i<map_points.size();i++)
+            triangulation(m_RefKeyFrame.mImage, m_CurrentKeyFrame.mImage, map_points);
+            for (int i = 0; i < map_points.size(); i++)
             {
                 Eigen::Vector3d eigen_vector;
                 eigen_vector(0) = map_points.at(i).mCameraPositionPoint.x;
                 eigen_vector(1) = map_points.at(i).mCameraPositionPoint.y;
                 eigen_vector(2) = map_points.at(i).mCameraPositionPoint.z;
 
-                ROS_INFO_STREAM("carmera:"<<map_points.at(i).mCameraPositionPoint);
+                ROS_INFO_STREAM("carmera:" << map_points.at(i).mCameraPositionPoint);
 
                 cv::Point3d cv_point;
-                cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x();
-                cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y();
-                cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
+                if (mMap.mMapPoints.size() % 2 == 0)
+                {
+                    cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
+                    cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() + 4.0;
+                    cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
+                }
+                else
+                {
+                    cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
+                    cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() - 4.0;
+                    cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
+                }
 
-                map_points.at(i).mWorldPositionPoint = cv_point;                 
-                
-                ROS_INFO_STREAM("world:"<<map_points.at(i).mWorldPositionPoint);
-               
+                map_points.at(i).mWorldPositionPoint = cv_point;
+
+                ROS_INFO_STREAM("world:" << map_points.at(i).mWorldPositionPoint);
+
                 m_CurrentKeyFrame.mMapPoints.push_back(map_points.at(i));
-                if(mMap.mMapPoints.empty())
+                if (mMap.mMapPoints.empty())
                     mMap.mMapPoints.push_back(map_points.at(i));
                 bool bPush = false;
-                for(int j = 0;j < mMap.mMapPoints.size();j++)
+                for (int j = 0; j < mMap.mMapPoints.size(); j++)
                 {
-                    if(mMap.mMapPoints.at(j).mCard.code_id == map_points.at(i).mCard.code_id)
+                    if (mMap.mMapPoints.at(j).mCard.code_id == map_points.at(i).mCard.code_id)
                     {
                         bPush = true;
                         break;
                     }
-
                 }
-                if(bPush == false)               
+                if (bPush == false)
                     mMap.mMapPoints.push_back(map_points.at(i));
-
             }
             //mMap.mKeyFrames.push_back(m_CurrentKeyFrame);
-                    
+
             m_RefKeyFrame = m_CurrentKeyFrame;
         }
 
-        ROS_INFO_STREAM("***");
         visualization_msgs::MarkerArray markers;
         VisCardInWorld(markers);
+        publishVslam(viz);
         pub_MarkerRviz.publish(markers);
 
-        
         loop_rate.sleep();
     }
 }
