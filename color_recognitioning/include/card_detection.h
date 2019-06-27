@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:32 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-06-26 22:33:26
+ * @Last Modified time: 2019-06-27 10:21:06
  */
 
 #ifndef CARD_DETECTION_H
