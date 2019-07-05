@@ -73,12 +73,12 @@ include_directories(
 
 
 add_executable(vslam_node src/card_detection.cpp
-                                         src/card_detection_node.cpp
-                                         src/camera.cpp
-                                         src/key_frame.cpp
-                                         src/map_point.cpp
-                                         src/map.cpp
-                                        )
+                          src/card_detection_node.cpp
+                          src/camera.cpp
+                          src/key_frame.cpp
+                          src/map_point.cpp
+                          src/map.cpp
+                          )
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

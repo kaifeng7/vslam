@@ -22,12 +22,12 @@ void CardDetection::initROS()
 
     pub_DetectedImageRviz = nh_.advertise<sensor_msgs::Image>("/detected_image_rviz", 1);
     pub_MarkerRviz = nh_.advertise<visualization_msgs::MarkerArray>("/marker_rviz", 10);
-    pub_slam = nh_.advertise<vslam::Viz>("/slam_viz",10);
+    pub_slam = nh_.advertise<vslam::Viz>("/slam_viz", 10);
 
-    sub_Image = nh_.subscribe("/usb_cam/image_raw", 1, &CardDetection::callbackGetImage, this);
+    sub_Image = nh_.subscribe("/camera/image_raw", 1, &CardDetection::callbackGetImage, this);
     sub_Odom = nh_.subscribe("/odom/imu", 10, &CardDetection::callbackGetOdom, this);
-    mParam.max_area = 289;
-    mParam.min_area = 100;
+    mParam.max_area = 800;
+    mParam.min_area = 80;
     mParam.fx = 849.76198553;
     mParam.fy = 872.61330147;
     mParam.cx = 667.41712745;
@@ -59,16 +59,14 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
     m_CurrentImage.mCamera = Camera(mParam.fx, mParam.fy, mParam.cx, mParam.cy);
     Eigen::Quaterniond quat(m_CurrentPose.orientation.w, m_CurrentPose.orientation.x, m_CurrentPose.orientation.y, m_CurrentPose.orientation.z);
     Eigen::Vector3d t(m_CurrentPose.position.x, m_CurrentPose.position.y, m_CurrentPose.position.z);
-    Sophus::SE3d se3(quat, t);
-    m_CurrentImage.mCamera.mTwc = se3;
+    //Sophus::SE3d se3(quat, t);
+    //m_CurrentImage.mCamera.mTwc = se3;
 
     Eigen::Matrix3d r = quat.toRotationMatrix();
     m_CurrentImage.pose << r(0, 0), r(0, 1), r(0, 2), t(0, 0),
         r(1, 0), r(1, 1), r(1, 2), t(1, 0),
         r(2, 0), r(2, 1), r(2, 2), t(2, 0);
     m_CurrentImage.image_id = m_CountImageId++;
-    if (m_CurrentImage.image_id % 3 == 0)
-        return;
     cv::Mat imgHSV;
     cv::Mat imgPub;
     std::vector<cv::Mat> splitHSV;
@@ -77,27 +75,28 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
     cv::equalizeHist(splitHSV[2], splitHSV[2]); //直方图均衡化params::src dst
     cv::merge(splitHSV, imgHSV);
 
-    cv::Mat imgThresholdedYellow;
+    cv::Mat imgThresholdedRed;
     cv::Mat imgThresholdedBlue;
     //cv::namedWindow("Control", CV_WINDOW_AUTOSIZE); //create a window called "Control"
-    cv::inRange(imgHSV, cv::Scalar(0, 50, 131), cv::Scalar(31, 90, 255), imgThresholdedYellow);
-    cv::inRange(imgHSV, cv::Scalar(100, 169, 30), cv::Scalar(140, 255, 255), imgThresholdedBlue);
-    cv::Mat element1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, 1));
-    cv::morphologyEx(imgThresholdedYellow, imgThresholdedYellow, cv::MORPH_CLOSE, element1);
+    cv::inRange(imgHSV, cv::Scalar(156, 90, 90), cv::Scalar(180, 255, 255), imgThresholdedRed);
+    cv::inRange(imgHSV, cv::Scalar(100, 125, 32), cv::Scalar(140, 255, 255), imgThresholdedBlue);
+    cv::Mat element1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    cv::morphologyEx(imgThresholdedRed, imgThresholdedRed, cv::MORPH_CLOSE, element1);
     cv::morphologyEx(imgThresholdedBlue, imgThresholdedBlue, cv::MORPH_CLOSE, element1);
 
     cv::Mat imgThresholded;
-    imgThresholded = imgThresholdedBlue + imgThresholdedYellow;
+    imgThresholded = imgThresholdedBlue + imgThresholdedRed;
 
     //闭操作 (连接一些连通域)
     cv::Mat element2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7, 7));
     cv::morphologyEx(imgThresholded, imgThresholded, cv::MORPH_CLOSE, element2);
 
     //开操作 (去除一些噪点)
-    //cv::morphologyEx(imgThresholded, imgThresholded, cv::MORPH_OPEN, element);
+    cv::Mat element3 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, 1));
+    cv::morphologyEx(imgThresholded, imgThresholded, cv::MORPH_OPEN, element3);
     //cv::cvtColor(imgThresholded, imgPub, cv::COLOR_HSV2BGR);
 
-    std::vector<std::vector<cv::Point>> contours;
+    std::vector<std::vector<cv::Point> > contours;
     cv::findContours(imgThresholded, contours, CV_RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
     for (int i = 0; i < contours.size(); i++)
@@ -114,96 +113,43 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
                 continue;
 
             std::string code_id;
-            bool flag;
-            int count_yellow, count_blue, count_non;
-            if ((double)rect.height / rect.width < 12 && (double)rect.height / rect.width > 3)
+            int count_red, count_blue, count_non;
+            if ((double)rect.height / rect.width < 10 && (double)rect.height / rect.width > 5)
             {
 
                 for (int j = 0; j < 7; j++)
                 {
-                    flag = false;
                     count_blue = 0;
-                    count_yellow = 0;
+                    count_red = 0;
                     count_non = 0;
                     for (int k = 0; k < rect.width; k++)
                     {
                         int x = (int)(rect.x + k);
-                        int y = (int)(rect.y + rect.height / 14 * (j * 2 + 1));
-                        cv::circle(m_CurrentImageMat, cv::Point(x, y), 2, cv::Scalar(255, 255, 0));
-                        if (imgThresholdedBlue.at<uchar>(y, x) == 255)
+                        int y = (int)(rect.y + rect.height / 14.0 * (j * 2 + 1));
+                        //cv::circle(m_CurrentImageMat, cv::Point(x, y), 2, cv::Scalar(255, 255, 0));
+                        for (int p = -2; p <= 2; p++)
                         {
-                            count_blue++;
-                        }
-                        else if (imgThresholdedYellow.at<uchar>(y, x) == 255)
-                        {
-                            count_yellow++;
-                        }
-                        else
-                        {
-                            count_non++;
-                        }
+                            int dy = std::min(std::max(y + p, 0), 720);
 
-                        y = (int)(rect.y + rect.height / 14 * (j * 2 + 1) - 1);
-                        if (imgThresholdedBlue.at<uchar>(y, x) == 255)
-                        {
-                            count_blue++;
-                        }
-                        else if (imgThresholdedYellow.at<uchar>(y, x) == 255)
-                        {
-                            count_yellow++;
-                        }
-                        else
-                        {
-                            count_non++;
-                        }
-
-                        y = (int)(rect.y + rect.height / 14 * (j * 2 + 1) + 1);
-                        if (imgThresholdedBlue.at<uchar>(y, x) == 255)
-                        {
-                            count_blue++;
-                        }
-                        else if (imgThresholdedYellow.at<uchar>(y, x) == 255)
-                        {
-                            count_yellow++;
-                        }
-                        else
-                        {
-                            count_non++;
-                        }
-
-                        y = (int)(rect.y + rect.height / 14 * (j * 2 + 1) - 2);
-                        if (imgThresholdedBlue.at<uchar>(y, x) == 255)
-                        {
-                            count_blue++;
-                        }
-                        else if (imgThresholdedYellow.at<uchar>(y, x) == 255)
-                        {
-                            count_yellow++;
-                        }
-                        else
-                        {
-                            count_non++;
-                        }
-
-                        y = (int)(rect.y + rect.height / 14 * (j * 2 + 1) + 2);
-                        if (imgThresholdedBlue.at<uchar>(y, x) == 255)
-                        {
-                            count_blue++;
-                        }
-                        else if (imgThresholdedYellow.at<uchar>(y, x) == 255)
-                        {
-                            count_yellow++;
-                        }
-                        else
-                        {
-                            count_non++;
+                            if (imgThresholdedBlue.at<uchar>(y + p, x) == 255)
+                            {
+                                count_blue++;
+                            }
+                            else if (imgThresholdedRed.at<uchar>(y + p, x) == 255)
+                            {
+                                count_red++;
+                            }
+                            else
+                            {
+                                count_non++;
+                            }
                         }
                     }
-                    if (count_blue > count_yellow && count_blue > 0)
+                    if (count_blue > count_red && count_blue > 0)
                     {
                         code_id.push_back('0');
                     }
-                    else if (count_yellow > count_blue && count_yellow > 0)
+                    else if (count_red > count_blue && count_red > 0)
                     {
                         code_id.push_back('1');
                     }
@@ -212,10 +158,10 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
                         code_id.push_back('2');
                     }
 
-                    //ROS_INFO_STREAM("count_blue:" << count_blue << "count_yellow:" << count_yellow << "count_non" << count_non);
+                    ROS_INFO_STREAM("count_blue:" << count_blue << "count_red:" << count_red << "count_non" << count_non);
                 }
-                if (code_id == "1010101" || code_id == "0101010" || code_id == "0101000" ||
-                    code_id == "0001010" || code_id == "0100010" || code_id == "0101110")
+                 //if (code_id == "1010111" || code_id == "1010001" || code_id == "1010101" ||
+                 //   code_id == "1011001" || code_id == "1000101" || code_id == "0110101")
                 {
                     ROS_INFO_STREAM(code_id);
                     Card card;
@@ -236,9 +182,9 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
                     m_CurrentImage.card.push_back(card);
 
                     cv::rectangle(m_CurrentImageMat, rect, cv::Scalar(0, 0, 255));
+                    cv::putText(m_CurrentImageMat,code_id,card.center.pt,cv::FONT_HERSHEY_PLAIN,2,cv::Scalar(0,255,255));
                 }
             }
-            //cv::drawContours(m_CurrentImageMat,contours,i,cv::Scalar(0,0,255)); // 轮廓的颜色);
         }
     }
     if (m_CurrentImage.card.size() > 0)
@@ -382,7 +328,7 @@ void CardDetection::publishVslam(vslam::Viz &viz)
     vslam::Card card;
     camera.camera_pose = m_CurrentPose;
     viz.camera = camera;
-    for(int i =0;i <mMap.mMapPoints.size();i++)
+    for (int i = 0; i < mMap.mMapPoints.size(); i++)
     {
         card.card_pose.position.x = mMap.mMapPoints.at(i).mWorldPositionPoint.x;
         card.card_pose.position.y = mMap.mMapPoints.at(i).mWorldPositionPoint.y;
@@ -390,101 +336,107 @@ void CardDetection::publishVslam(vslam::Viz &viz)
         card.code_id = mMap.mMapPoints.at(i).mCard.code_id;
         card.card_id = i;
         viz.cards.push_back(card);
-    }        
+    }
     pub_slam.publish(viz);
-
 }
-
 
 void CardDetection::MainLoop()
 {
     ROS_INFO_STREAM("card_detection start");
     ros::Rate loop_rate(5);
     vslam::Viz viz;
+        
 
     while (ros::ok())
     {
 
-        ros::spinOnce();
-
+        ros::spinOnce();    
+        
+        //debug
+        //cv::namedWindow("Control", CV_WINDOW_AUTOSIZE); //create a window called "Control"
+        //cvCreateTrackbar("max", "Control", &mParam.max_area, 1000); 
+        //cvCreateTrackbar("min", "Control", &mParam.min_area, 1000);
         if (bImage == false)
         {
             ROS_WARN_STREAM("wait Image msg...");
             continue;
         }
-        if (bOdom == false)
-        {
-            ROS_WARN_STREAM("wait Odom msg...");
-            continue;
-        }
+        // if (bOdom == false)
+        // {
+        //     ROS_WARN_STREAM("wait Odom msg...");
+        //     continue;
+        // }
 
-        if (bInit && m_CurrentKeyFrame.mKeyFrameId == 0)
-        {
-            m_RefKeyFrame = m_CurrentKeyFrame;
-        }
-        else if (bInit)
-        {
-            std::vector<MapPoint> map_points;
-            m_RefKeyFrame = m_CurrentKeyFrame;
-            triangulation(m_RefKeyFrame.mImage, m_CurrentKeyFrame.mImage, map_points);
-            for (int i = 0; i < map_points.size(); i++)
-            {
-                Eigen::Vector3d eigen_vector;
-                eigen_vector(0) = map_points.at(i).mCameraPositionPoint.x;
-                eigen_vector(1) = map_points.at(i).mCameraPositionPoint.y;
-                eigen_vector(2) = map_points.at(i).mCameraPositionPoint.z;
+        // if (bInit && m_CurrentKeyFrame.mKeyFrameId == 0)
+        // {
+        //     m_RefKeyFrame = m_CurrentKeyFrame;
+        // }
+        // else if (bInit)
+        // {
+        //     std::vector<MapPoint> map_points;
+        //     m_RefKeyFrame = m_CurrentKeyFrame;
+        //     triangulation(m_RefKeyFrame.mImage, m_CurrentKeyFrame.mImage, map_points);
+        //     for (int i = 0; i < map_points.size(); i++)
+        //     {
+        //         Eigen::Vector3d eigen_vector;
+        //         eigen_vector(0) = map_points.at(i).mCameraPositionPoint.x;
+        //         eigen_vector(1) = map_points.at(i).mCameraPositionPoint.y;
+        //         eigen_vector(2) = map_points.at(i).mCameraPositionPoint.z;
 
-                ROS_INFO_STREAM("carmera:" << map_points.at(i).mCameraPositionPoint);
+        //         ROS_INFO_STREAM("carmera:" << map_points.at(i).mCameraPositionPoint);
 
-                cv::Point3d cv_point;
-                if (mMap.mMapPoints.size() == 0)
-                {
-                    cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
-                    cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() - 4.0;
-                    cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
-                }
-                else if (mMap.mMapPoints.size() % 2 == 0)
-                {
-                    cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
-                    cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() + 4.0;
-                    cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
-                }
-                else
-                {
-                    cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
-                    cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() - 4.0;
-                    cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
-                }
+        //         cv::Point3d cv_point;
+        //         if (mMap.mMapPoints.size() == 0)
+        //         {
+        //             cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
+        //             cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() + 4.0;
+        //             cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
+        //         }
+        //         else if (mMap.mMapPoints.size() % 2 == 0)
+        //         {
+        //             cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
+        //             cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() - 4.0;
+        //             cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
+        //         }
+        //         else
+        //         {
+        //             cv_point.x = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).x() + 4.0;
+        //             cv_point.y = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).y() + 4.0;
+        //             cv_point.z = m_CurrentKeyFrame.mImage.mCamera.camera2world(eigen_vector).z();
+        //         }
 
-                map_points.at(i).mWorldPositionPoint = cv_point;
+        //         map_points.at(i).mWorldPositionPoint = cv_point;
 
-                ROS_INFO_STREAM("world:" << map_points.at(i).mWorldPositionPoint);
+        //         ROS_INFO_STREAM("world:" << map_points.at(i).mWorldPositionPoint);
 
-                m_CurrentKeyFrame.mMapPoints.push_back(map_points.at(i));
-                if (mMap.mMapPoints.empty())
-                    mMap.mMapPoints.push_back(map_points.at(i));
-                bool bPush = false;
-                for (int j = 0; j < mMap.mMapPoints.size(); j++)
-                {
-                    if (mMap.mMapPoints.at(j).mCard.code_id == map_points.at(i).mCard.code_id)
-                    {
-                        bPush = true;
-                        break;
-                    }
-                }
-                if (bPush == false)
-                    mMap.mMapPoints.push_back(map_points.at(i));
-            }
-            //mMap.mKeyFrames.push_back(m_CurrentKeyFrame);
+        //         m_CurrentKeyFrame.mMapPoints.push_back(map_points.at(i));
+        //         if (mMap.mMapPoints.empty())
+        //             mMap.mMapPoints.push_back(map_points.at(i));
+        //         bool bPush = false;
+        //         for (int j = 0; j < mMap.mMapPoints.size(); j++)
+        //         {
+        //             if (mMap.mMapPoints.at(j).mCard.code_id == map_points.at(i).mCard.code_id)
+        //             {
+        //                 bPush = true;
+        //                 break;
+        //             }
+        //         }
+        //         if (bPush == false)
+        //             mMap.mMapPoints.push_back(map_points.at(i));
+        //     }
+        //     //mMap.mKeyFrames.push_back(m_CurrentKeyFrame);
 
-            m_RefKeyFrame = m_CurrentKeyFrame;
-        }
+        //     m_RefKeyFrame = m_CurrentKeyFrame;
+        // }
+        // visualization_msgs::MarkerArray markers;
+        // VisCardInWorld(markers);
+        // publishVslam(viz);
+        // pub_MarkerRviz.publish(markers);
 
-        visualization_msgs::MarkerArray markers;
-        VisCardInWorld(markers);
-        publishVslam(viz);
-        pub_MarkerRviz.publish(markers);
+        //debug
+          cv::imshow("Control", m_CurrentImageMat);
+          cv::waitKey(1);
 
-        loop_rate.sleep();
+        // loop_rate.sleep();
     }
 }

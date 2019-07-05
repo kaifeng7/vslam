@@ -31,8 +31,8 @@ class Card;
 
 struct DetectionParam
 {
-    double max_area;
-    double min_area;
+    int max_area;
+    int min_area;
     double fx;
     double fy;
     double cx;
