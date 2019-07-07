@@ -1,0 +1,22 @@
+maxRectArea: 800
+minRectArea: 80
+
+fx: 849.76198553;
+fy: 872.61330147;
+cx: 667.41712745;
+cy: 420.58234102;
+
+
+maxRedH: 180
+minRedH: 156
+maxRedS: 255
+minRedS: 90
+maxRedV: 255
+minRedV: 90
+
+maxBlueH: 140
+minBlueH: 100
+maxBlueS: 255
+minBlueS: 125
+maxBlueV: 255
+minBlueV: 32

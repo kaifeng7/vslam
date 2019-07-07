@@ -1,0 +1,7 @@
+<launch>
+    <node pkg="vslam" type="vslam_node" name="vslam_node" output="screen">
+        <rosparam file = "$(find vslam)/params/vslam.yaml" command="load"/>
+    
+    </node>
+
+</launch>

@@ -21,6 +21,7 @@ struct Card
     std::vector<cv::KeyPoint> key_points;
     cv::KeyPoint center;
     std::string code_id;
+    Eigen::Vector3d pose;
 };
 
 struct Image

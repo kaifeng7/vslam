@@ -26,12 +26,28 @@ void CardDetection::initROS()
 
     sub_Image = nh_.subscribe("/camera/image_raw", 1, &CardDetection::callbackGetImage, this);
     sub_Odom = nh_.subscribe("/odom/imu", 10, &CardDetection::callbackGetOdom, this);
-    mParam.max_area = 800;
-    mParam.min_area = 80;
-    mParam.fx = 849.76198553;
-    mParam.fy = 872.61330147;
-    mParam.cx = 667.41712745;
-    mParam.cy = 420.58234102;
+
+    pnh_.param<int>("maxRectArea", mParam.max_area, 0);
+    pnh_.param<int>("minRectArea", mParam.min_area, 0);
+
+    pnh_.param<double>("fx", mParam.fx, 0);
+    pnh_.param<double>("fy", mParam.fy, 0);
+    pnh_.param<double>("cx", mParam.cx, 0);
+    pnh_.param<double>("cy", mParam.cy, 0);
+
+    pnh_.param<int>("maxRedH", mParam.max_red_h, 0);
+    pnh_.param<int>("minRedH", mParam.min_red_h, 0);
+    pnh_.param<int>("maxRedS", mParam.max_red_s, 0);
+    pnh_.param<int>("minRedS", mParam.min_red_s, 0);
+    pnh_.param<int>("maxRedV", mParam.max_red_v, 0);
+    pnh_.param<int>("minRedV", mParam.min_red_v, 0);
+
+    pnh_.param<int>("maxBlueH", mParam.max_blue_h, 0);
+    pnh_.param<int>("minBlueH", mParam.min_blue_h, 0);
+    pnh_.param<int>("maxBlueS", mParam.max_blue_s, 0);
+    pnh_.param<int>("minBlueS", mParam.min_blue_s, 0);
+    pnh_.param<int>("maxBlueV", mParam.max_blue_v, 0);
+    pnh_.param<int>("minBlueV", mParam.min_blue_v, 0);
 }
 
 void CardDetection::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
@@ -77,10 +93,9 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
 
     cv::Mat imgThresholdedRed;
     cv::Mat imgThresholdedBlue;
-    //cv::namedWindow("Control", CV_WINDOW_AUTOSIZE); //create a window called "Control"
-    cv::inRange(imgHSV, cv::Scalar(156, 90, 90), cv::Scalar(180, 255, 255), imgThresholdedRed);
-    cv::inRange(imgHSV, cv::Scalar(100, 125, 32), cv::Scalar(140, 255, 255), imgThresholdedBlue);
-    cv::Mat element1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    cv::inRange(imgHSV, cv::Scalar(mParam.min_red_h, mParam.min_red_s, mParam.min_red_v), cv::Scalar(mParam.max_red_h, mParam.max_red_s, mParam.max_red_v), imgThresholdedRed);
+    cv::inRange(imgHSV, cv::Scalar(mParam.min_blue_h, mParam.min_blue_s, mParam.min_blue_v), cv::Scalar(mParam.max_blue_h, mParam.max_blue_s, mParam.max_blue_v), imgThresholdedBlue);
+    cv::Mat element1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, 1));
     cv::morphologyEx(imgThresholdedRed, imgThresholdedRed, cv::MORPH_CLOSE, element1);
     cv::morphologyEx(imgThresholdedBlue, imgThresholdedBlue, cv::MORPH_CLOSE, element1);
 
@@ -96,7 +111,7 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
     cv::morphologyEx(imgThresholded, imgThresholded, cv::MORPH_OPEN, element3);
     //cv::cvtColor(imgThresholded, imgPub, cv::COLOR_HSV2BGR);
 
-    std::vector<std::vector<cv::Point> > contours;
+    std::vector<std::vector<cv::Point>> contours;
     cv::findContours(imgThresholded, contours, CV_RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
     for (int i = 0; i < contours.size(); i++)
@@ -114,8 +129,9 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
 
             std::string code_id;
             int count_red, count_blue, count_non;
-            if ((double)rect.height / rect.width < 10 && (double)rect.height / rect.width > 5)
+            if ((double)rect.height / rect.width < 9 && (double)rect.height / rect.width > 5)
             {
+                bool flag_2 = false;
 
                 for (int j = 0; j < 7; j++)
                 {
@@ -135,33 +151,29 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
                             {
                                 count_blue++;
                             }
-                            else if (imgThresholdedRed.at<uchar>(y + p, x) == 255)
+                            if (imgThresholdedRed.at<uchar>(y + p, x) == 255)
                             {
                                 count_red++;
                             }
-                            else
-                            {
-                                count_non++;
-                            }
                         }
                     }
-                    if (count_blue > count_red && count_blue > 0)
+                    if (count_blue > count_red + 5)
                     {
                         code_id.push_back('0');
                     }
-                    else if (count_red > count_blue && count_red > 0)
+                    else if (count_red > count_blue + 5)
                     {
                         code_id.push_back('1');
                     }
                     else
                     {
                         code_id.push_back('2');
+                        flag_2 = true;
                     }
 
                     ROS_INFO_STREAM("count_blue:" << count_blue << "count_red:" << count_red << "count_non" << count_non);
                 }
-                 //if (code_id == "1010111" || code_id == "1010001" || code_id == "1010101" ||
-                 //   code_id == "1011001" || code_id == "1000101" || code_id == "0110101")
+                if (flag_2 == false && code_id != "1111111" && code_id != "0000000")
                 {
                     ROS_INFO_STREAM(code_id);
                     Card card;
@@ -182,7 +194,7 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
                     m_CurrentImage.card.push_back(card);
 
                     cv::rectangle(m_CurrentImageMat, rect, cv::Scalar(0, 0, 255));
-                    cv::putText(m_CurrentImageMat,code_id,card.center.pt,cv::FONT_HERSHEY_PLAIN,2,cv::Scalar(0,255,255));
+                    cv::putText(m_CurrentImageMat, code_id, card.center.pt, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 255));
                 }
             }
         }
@@ -194,6 +206,7 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
         m_CurrentKeyFrame.mKeyFrameId = m_CountKeyFrameId++;
     }
     pub_ptr->image = m_CurrentImageMat;
+    //m_CurrentImageMat = imgThresholdedRed;
     pub_DetectedImageRviz.publish(pub_ptr->toImageMsg());
 }
 
@@ -245,6 +258,8 @@ void CardDetection::VisCardInWorld(visualization_msgs::MarkerArray &markers)
         markers.markers.push_back(marker);
     }
 }
+
+void
 
 void CardDetection::triangulation(const Image &image1, const Image &image2, std::vector<MapPoint> &map_points)
 {
@@ -345,16 +360,15 @@ void CardDetection::MainLoop()
     ROS_INFO_STREAM("card_detection start");
     ros::Rate loop_rate(5);
     vslam::Viz viz;
-        
 
     while (ros::ok())
     {
 
-        ros::spinOnce();    
-        
+        ros::spinOnce();
+
         //debug
         //cv::namedWindow("Control", CV_WINDOW_AUTOSIZE); //create a window called "Control"
-        //cvCreateTrackbar("max", "Control", &mParam.max_area, 1000); 
+        //cvCreateTrackbar("max", "Control", &mParam.max_area, 1000);
         //cvCreateTrackbar("min", "Control", &mParam.min_area, 1000);
         if (bImage == false)
         {
@@ -434,8 +448,8 @@ void CardDetection::MainLoop()
         // pub_MarkerRviz.publish(markers);
 
         //debug
-          cv::imshow("Control", m_CurrentImageMat);
-          cv::waitKey(1);
+        cv::imshow("Control", m_CurrentImageMat);
+        cv::waitKey(1);
 
         // loop_rate.sleep();
     }
