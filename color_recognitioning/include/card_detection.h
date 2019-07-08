@@ -72,6 +72,7 @@ class CardDetection
         bool bInit;//初始化
 
         cv::Mat m_CurrentImageMat;
+        cv::Mat image;
         Image m_CurrentImage;
         Image m_LastImage;
         geometry_msgs::Pose m_CurrentPose;
@@ -92,6 +93,7 @@ class CardDetection
         void VisCardInWorld(visualization_msgs::MarkerArray &markers);
         void publishVslam(vslam::Viz &viz);
         void detectDistance(Image &image);
+        void Undistort(const cv::Mat &input,cv::Mat &output);
        
         void initROS();
         void MainLoop();

@@ -29,15 +29,15 @@ void CardDetection::initROS()
     pnh_.param<int>("maxRectArea", mParam.max_area, 0);
     pnh_.param<int>("minRectArea", mParam.min_area, 0);
 
-    pnh_.param<double>("fx", mParam.fx, 0);
-    pnh_.param<double>("fy", mParam.fy, 0);
-    pnh_.param<double>("cx", mParam.cx, 0);
-    pnh_.param<double>("cy", mParam.cy, 0);
-    pnh_.param<double>("k1", mParam.k1, 0);
-    pnh_.param<double>("k2", mParam.k2, 0);
-    pnh_.param<double>("k3", mParam.k3, 0);
-    pnh_.param<double>("p1", mParam.p1, 0);
-    pnh_.param<double>("p2", mParam.p2, 0);
+    pnh_.param<double>("fx", mCameraParam.fx, 0);
+    pnh_.param<double>("fy", mCameraParam.fy, 0);
+    pnh_.param<double>("cx", mCameraParam.cx, 0);
+    pnh_.param<double>("cy", mCameraParam.cy, 0);
+    pnh_.param<double>("k1", mCameraParam.k1, 0);
+    pnh_.param<double>("k2", mCameraParam.k2, 0);
+    pnh_.param<double>("k3", mCameraParam.k3, 0);
+    pnh_.param<double>("p1", mCameraParam.p1, 0);
+    pnh_.param<double>("p2", mCameraParam.p2, 0);
 
 
     pnh_.param<int>("maxRedH", mParam.max_red_h, 0);
@@ -53,6 +53,9 @@ void CardDetection::initROS()
     pnh_.param<int>("minBlueS", mParam.min_blue_s, 0);
     pnh_.param<int>("maxBlueV", mParam.max_blue_v, 0);
     pnh_.param<int>("minBlueV", mParam.min_blue_v, 0);
+
+    mCameraParam.setK();
+    mCameraParam.setD();
 }
 
 void CardDetection::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
@@ -77,8 +80,8 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
         return;
     }
     m_CurrentImageMat = cv_ptr->image;
-    m_CurrentImage.mCamera = Camera(mParam.fx, mParam.fy, mParam.cx, mParam.cy,
-                                    mParam.k1, mParam.k2, mParam.k3, mParam.p1, mParam.p2);
+
+    Undistort(m_CurrentImageMat,image);
 
     Eigen::Quaterniond quat(m_CurrentPose.orientation.w, m_CurrentPose.orientation.x, m_CurrentPose.orientation.y, m_CurrentPose.orientation.z);
     Eigen::Vector3d t(m_CurrentPose.position.x, m_CurrentPose.position.y, m_CurrentPose.position.z);
@@ -283,7 +286,7 @@ void CardDetection::detectDistance(Image &image)
         for(int j = 0;j<4;j++)
         {   
             cv::Point2d point(card.key_points.at(j).x-1.0,card.key_points.at(j).y-1.0);
-            v[j] = image.mCamera.pixel2camera(point,1);
+            v[j] = image.mCamera.pixel2camera(point,mCameraParam,1);
         }
         double width,height;
         width = (v[1]-v[0]).x();
@@ -294,6 +297,20 @@ void CardDetection::detectDistance(Image &image)
         //ROS_INFO_STREAM(depth);
     }
 }
+
+void CardDetection::Undistort(const cv::Mat &input,cv::Mat &output)
+{
+    
+
+    cv::Mat map1, map2;
+    cv::Size imageSize;
+    imageSize = input.size();
+    initUndistortRectifyMap(mCameraParam.setK, mCameraParam.setD(), cv::Mat(),
+    getOptimalNewCameraMatrix(mCameraParam.setK, mCameraParam.setD(), imageSize, 1, imageSize, 0),
+    imageSize, CV_16SC2, map1, map2);
+    cv::remap(input, output, map1, map2, cv::INTER_LINEAR);
+}
+
 
 // void CardDetection::triangulation(const Image &image1, const Image &image2, std::vector<MapPoint> &map_points)
 // {
@@ -482,7 +499,7 @@ void CardDetection::MainLoop()
         // pub_MarkerRviz.publish(markers);
 
         //debug
-        cv::imshow("Control", m_CurrentImageMat);
+        cv::imshow("Control", image);
         cv::waitKey(1);
 
         // loop_rate.sleep();
