@@ -47,14 +47,6 @@ struct DetectionParam
     int min_blue_h;
     int min_blue_s;
     int min_blue_v;  
-    
-    
-    double fx;
-    double fy;
-    double cx;
-    double cy;
-
-
 
 };
 
@@ -90,6 +82,7 @@ class CardDetection
         int m_CountImageId;
         int m_CountKeyFrameId;
         DetectionParam mParam;//参数
+        CameraParam mCameraParam;//相机参数
 
         SlamMap mMap;
 
@@ -98,7 +91,7 @@ class CardDetection
         void triangulation(const Image& image1,const Image& image2,std::vector<MapPoint> &map_points);
         void VisCardInWorld(visualization_msgs::MarkerArray &markers);
         void publishVslam(vslam::Viz &viz);
-        cv::Point3d detectDistance(const Card &card);
+        void detectDistance(Image &image);
        
         void initROS();
         void MainLoop();

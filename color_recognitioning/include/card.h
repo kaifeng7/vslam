@@ -17,9 +17,9 @@
 
 struct Card
 {
-
-    std::vector<cv::KeyPoint> key_points;
-    cv::KeyPoint center;
+    std::vector<cv::Point2i> key_points;
+    cv::Point2i center;
+    int width,height;
     std::string code_id;
     Eigen::Vector3d pose;
 };

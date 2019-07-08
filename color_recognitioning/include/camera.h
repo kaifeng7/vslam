@@ -16,19 +16,26 @@ class Camera
 {
 public:
     Camera();
-    Camera(const double &fx,const double &fy,const double &cx,const double &cy);
     ~Camera();
 
     Eigen::Vector3d world2camera(const Eigen::Vector3d &point_in_world);
     Eigen::Vector3d camera2world(const Eigen::Vector3d &point_in_camera);
-    Eigen::Vector2d camera2pixel(const Eigen::Vector3d &point_in_camera);
-    Eigen::Vector3d pixel2camera(const Eigen::Vector2d &point_in_pixel,double depth);
-    Eigen::Vector2d world2pixel(const Eigen::Vector3d &point_in_world);
-    Eigen::Vector3d pixel2world(const Eigen::Vector2d &point_in_pixel,double depth);
-    cv::Mat mK; //内参矩阵
-    double mFx, mFy, mCx, mCy;
+    cv::Point2i camera2pixel(const Eigen::Vector3d &point_in_camera,const CameraParam &camera_param);
+    Eigen::Vector3d pixel2camera(const cv::Point2i &point_in_pixel,const CameraParam &camera_param,double depth);
+    cv::Point2i world2pixel(const Eigen::Vector3d &point_in_world);
+    Eigen::Vector3d pixel2world(const cv::Point2i &point_in_pixel,double depth);
     Sophus::SE3d mTwc;
-    cv::Mat setK(const double &fx, const double &fy, const double &cx, const double &cy);
+};
+
+class CameraParam
+{
+    public:
+        cv::Mat mK;//内参矩阵
+        double fx,fy,cx,cy;
+        cv::Mat mD;//畸变矩阵
+        double k1,k2,k3,p1,p2;
+        cv::Mat setK();
+        cv::Mat setD();
 };
 
 #endif

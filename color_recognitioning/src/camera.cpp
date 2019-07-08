@@ -11,22 +11,12 @@ Camera::Camera()
 
 }
 
-Camera::Camera(const double &fx,const double &fy,const double &cx,const double &cy):mFx(fx),mFy(fy),mCx(cx),mCy(cy)
-{
-    mK = setK(mFx,mFy,mCx,mCy);
-}
 
 Camera::~Camera()
 {
 
 }
 
-cv::Mat Camera::setK(const double &fx,const double &fy,const double &cx,const double &cy)
-{    
-    return(cv::Mat_<double>(3,3)<<fx,0, cx,
-                                  0, fy,cy,
-                                  0, 0, 1);
-}
 
 Eigen::Vector3d Camera::world2camera(const Eigen::Vector3d &point_in_world)
 {
@@ -38,20 +28,31 @@ Eigen::Vector3d Camera::camera2world(const Eigen::Vector3d &point_in_camera)
     return mTwc * point_in_camera; 
 }
 
-Eigen::Vector2d Camera::camera2pixel(const Eigen::Vector3d &point_in_camera)
+cv::Point2i Camera::camera2pixel(const Eigen::Vector3d &point_in_camera,const CameraParam &camera_param)
 {
     double x,y;
-    x = mFx * point_in_camera(0,0)/point_in_camera(2,0)+mCx;
-    y = mFy * point_in_camera(1,0)/point_in_camera(2,0)+mCy;
-    return Eigen::Vector2d(x,y);
+    x = camera_param.fx * point_in_camera(0,0)/point_in_camera(2,0)+camera_param.cx;
+    y = camera_param.fy * point_in_camera(1,0)/point_in_camera(2,0)+camera_param.cy;
+    return cv::Point2i((int)x,(int)y);
 }
 
-Eigen::Vector3d Camera::pixel2camera(const Eigen::Vector2d &point_in_pixel,double depth)
+Eigen::Vector3d Camera::pixel2camera(const cv::Point2i &point_in_pixel,const CameraParam &camera_param,double depth)
 {
     double x,y;
-    x = (point_in_pixel(0,0)-mCx)*depth/mFx;
-    y = (point_in_pixel(1,0)-mCy)*depth/mFy;
+    x = ((double)point_in_pixel.x-camera_param.cx)*depth/camera_param.fx;
+    y = ((double)point_in_pixel.y-camera_param.cy)*depth/camera_param.fy;
     return Eigen::Vector3d(x,y,depth);
 }
 
 
+cv::Mat CameraParam::setK()
+{    
+    return(cv::Mat_<double>(3,3)<<fx,0, cx,
+                                  0, fy,cy,
+                                  0, 0, 1);
+}
+
+cv::Mat CameraParam::setD()
+{    
+    return(cv::Mat_<double>(5,1)<<k1,k2,p1,p2,k3);
+}
