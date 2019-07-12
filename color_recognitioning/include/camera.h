@@ -16,11 +16,12 @@ class CameraParam
 {
 public:
     cv::Mat mK; //内参矩阵
+    cv::Mat mNewK;
     double fx, fy, cx, cy;
     cv::Mat mD; //畸变矩阵
     double k1, k2, k3, p1, p2;
-    cv::Mat setK();
-    cv::Mat setD();
+    void setK();
+    void setD();
 };
 
 class Camera

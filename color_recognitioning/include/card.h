@@ -21,7 +21,18 @@ struct Card
     cv::Point2i center;
     int width,height;
     std::string code_id;
+    int card_id;
     Eigen::Vector3d pose;
+    int code2card(const std::string &str)
+    {
+        int sum = 0;
+        for(int i=0;i<str.size()-1;i++)
+        {
+            sum*=2;
+            sum += (str.at(i)-'0');
+        }
+        return card_id;
+    }
 };
 
 struct Image

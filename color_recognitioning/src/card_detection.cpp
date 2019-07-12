@@ -2,29 +2,31 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:30 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-06-25 22:37:38
+ * @Last Modified time: 2019-07-12 16:46:59
  */
 
 #include "card_detection.h"
 
-CardDetection::CardDetection() : pnh_("~"), bImage(false), bOdom(false), bInit(false), m_CountImageId(0), m_CountKeyFrameId(0)
+VSlam::VSlam() : pnh_("~"), bImage(false), bOdom(false), bInit(false), 
+                 m_CountImageId(0), m_CountKeyFrameId(0),
+                 mp_CurrentKeyFrame(nullptr),mp_RefKeyFrame(nullptr)
 {
     initROS();
 }
 
-CardDetection::~CardDetection()
+VSlam::~VSlam()
 {
 }
 
-void CardDetection::initROS()
+void VSlam::initROS()
 {
 
     pub_DetectedImageRviz = nh_.advertise<sensor_msgs::Image>("/detected_image_rviz", 1);
     pub_MarkerRviz = nh_.advertise<visualization_msgs::MarkerArray>("/marker_rviz", 10);
     pub_slam = nh_.advertise<vslam::Viz>("/slam_viz", 10);
 
-    sub_Image = nh_.subscribe("/camera/image_raw", 1, &CardDetection::callbackGetImage, this);
-    sub_Odom = nh_.subscribe("/odom/imu", 10, &CardDetection::callbackGetOdom, this);
+    sub_Image = nh_.subscribe("/camera/image_raw", 1, &VSlam::callbackGetImage, this);
+    sub_Odom = nh_.subscribe("/odom/imu", 10, &VSlam::callbackGetOdom, this);
 
     pnh_.param<int>("maxRectArea", mParam.max_area, 0);
     pnh_.param<int>("minRectArea", mParam.min_area, 0);
@@ -38,7 +40,6 @@ void CardDetection::initROS()
     pnh_.param<double>("k3", mCameraParam.k3, 0);
     pnh_.param<double>("p1", mCameraParam.p1, 0);
     pnh_.param<double>("p2", mCameraParam.p2, 0);
-
 
     pnh_.param<int>("maxRedH", mParam.max_red_h, 0);
     pnh_.param<int>("minRedH", mParam.min_red_h, 0);
@@ -58,13 +59,13 @@ void CardDetection::initROS()
     mCameraParam.setD();
 }
 
-void CardDetection::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
+void VSlam::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
 {
     bOdom = true;
     m_CurrentPose = msg->pose.pose;
 }
 
-void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
+void VSlam::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
 {
     cv_bridge::CvImagePtr cv_ptr;
     cv_bridge::CvImagePtr pub_ptr;
@@ -79,25 +80,45 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
-    m_CurrentImageMat = cv_ptr->image;
 
-    Undistort(m_CurrentImageMat,image);
+    m_ImageRawMat = cv_ptr->image;
 
-    Eigen::Quaterniond quat(m_CurrentPose.orientation.w, m_CurrentPose.orientation.x, m_CurrentPose.orientation.y, m_CurrentPose.orientation.z);
-    Eigen::Vector3d t(m_CurrentPose.position.x, m_CurrentPose.position.y, m_CurrentPose.position.z);
+    Undistort(m_ImageRawMat, m_CurrentImageMat);
+
+    //Eigen::Quaterniond quat(m_CurrentPose.orientation.w, m_CurrentPose.orientation.x, m_CurrentPose.orientation.y, m_CurrentPose.orientation.z);
+    //Eigen::Vector3d t(m_CurrentPose.position.x, m_CurrentPose.position.y, m_CurrentPose.position.z);
     //Sophus::SE3d se3(quat, t);
     //m_CurrentImage.mCamera.mTwc = se3;
 
-    Eigen::Matrix3d r = quat.toRotationMatrix();
-    m_CurrentImage.pose << r(0, 0), r(0, 1), r(0, 2), t(0, 0),
-        r(1, 0), r(1, 1), r(1, 2), t(1, 0),
-        r(2, 0), r(2, 1), r(2, 2), t(2, 0);
+    //Eigen::Matrix3d r = quat.toRotationMatrix();
+    // m_CurrentImage.pose << r(0, 0), r(0, 1), r(0, 2), t(0, 0),
+    //     r(1, 0), r(1, 1), r(1, 2), t(1, 0),
+    //     r(2, 0), r(2, 1), r(2, 2), t(2, 0);
+
     m_CurrentImage.image_id = m_CountImageId++;
     m_CurrentImage.card.clear();
+
+    cardDetection(m_CurrentImageMat, m_CurrentImage);
+    detectDistance(m_CurrentImage);
+    
+    if(m_CurrentImage.card.size()>1)
+    {
+        mp_CurrentKeyFrame = new KeyFrame();
+        setKeyFrame(m_CurrentImage, mp_CurrentKeyFrame, mp_RefKeyFrame);
+    }
+
+
+
+    pub_ptr->image = m_CurrentImageMat;
+    //m_CurrentImageMat = imgThresholdedRed;
+    pub_DetectedImageRviz.publish(pub_ptr->toImageMsg());
+}
+
+void VSlam::cardDetection(cv::Mat &mat, Image &image)
+{
     cv::Mat imgHSV;
-    cv::Mat imgPub;
     std::vector<cv::Mat> splitHSV;
-    cv::cvtColor(m_CurrentImageMat, imgHSV, cv::COLOR_BGR2HSV);
+    cv::cvtColor(mat, imgHSV, cv::COLOR_BGR2HSV);
     cv::split(imgHSV, splitHSV);
     cv::equalizeHist(splitHSV[2], splitHSV[2]); //直方图均衡化params::src dst
     cv::merge(splitHSV, imgHSV);
@@ -120,7 +141,6 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
     //开操作 (去除一些噪点)
     cv::Mat element3 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, 1));
     cv::morphologyEx(imgThresholded, imgThresholded, cv::MORPH_OPEN, element3);
-    //cv::cvtColor(imgThresholded, imgPub, cv::COLOR_HSV2BGR);
 
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(imgThresholded, contours, CV_RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
@@ -142,7 +162,7 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
             std::string code_id;
             int count_red, count_blue, count_non;
 
-            if ((double)rect.height / rect.width < 9 && (double)rect.height / rect.width > 5)
+            if ((double)rect.height / rect.width < 10 && (double)rect.height / rect.width > 4)
             {
                 bool flag_2 = false;
 
@@ -194,6 +214,7 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
                     card.width = rect.width;
                     card.height = rect.height;
                     card.center = rotated_rect.center;
+                    card.card_id = card.code2card(card.code_id);
 
                     cv::Point2i lt, rt, lb, rb;
                     lt = cv::Point2i(rect.x, rect.y);
@@ -207,30 +228,64 @@ void CardDetection::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
 
                     rb = cv::Point2i(rect.x + rect.width, rect.y + rect.height);
                     card.key_points.push_back(rb);
-                    m_CurrentImage.card.push_back(card);
+                    image.card.push_back(card);
 
-                    cv::rectangle(m_CurrentImageMat, rect, cv::Scalar(0, 0, 255));
-                    cv::putText(m_CurrentImageMat, code_id, card.center, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 255));
+                    cv::rectangle(mat, rect, cv::Scalar(0, 0, 255));
+                    cv::putText(mat, code_id, card.center, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 255));
+                    cv::putText(mat, std::to_string(card.card_id), card.key_points.at(1), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 0, 255));
+
                 }
             }
         }
     }
-
-    detectDistance(m_CurrentImage);
-    if (m_CurrentImage.card.size() > 0)
-    {
-        bInit = true;
-        m_CurrentKeyFrame.mImage = m_CurrentImage;
-        m_CurrentKeyFrame.mKeyFrameId = m_CountKeyFrameId++;
-    }
-    pub_ptr->image = m_CurrentImageMat;
-    //m_CurrentImageMat = imgThresholdedRed;
-    pub_DetectedImageRviz.publish(pub_ptr->toImageMsg());
 }
 
-void CardDetection::VisCardInWorld(visualization_msgs::MarkerArray &markers)
+void VSlam::setKeyFrame(const Image &img, KeyFrame *kf_cur, KeyFrame *kf_ref)
 {
-    std::vector<MapPoint> map_points = mMap.mMapPoints;
+        kf_ref = kf_cur;
+    
+        kf_cur = new KeyFrame(img,m_CountKeyFrameId++);
+        kf_cur->refKeyFrame = kf_ref;
+
+        mMap.insertKeyFrame(kf_cur);
+}
+
+void VSlam::setCameraPose(KeyFrame *kf)
+{
+    if (kf.mKeyFrameId == 0)
+    {
+        Eigen::Matrix3d r = Eigen::Matrix3d::Identity();
+        Eigen::Vector3d t = Eigen::Vector3d::Zero();
+        Sophus::SE3d se3(r, t);
+        m_CurrentImage.mCamera.mTwc = se3;
+        m_CurrentImage.pose << r(0, 0), r(0, 1), r(0, 2), t(0, 0),
+            r(1, 0), r(1, 1), r(1, 2), t(1, 0),
+            r(2, 0), r(2, 1), r(2, 2), t(2, 0);
+        return;
+    }
+    else
+    {
+        for(int i = 0;i<m_Current)
+    }
+    
+}
+
+void VSlam::setMapPoint(KeyFrame *pKF)
+{
+    for (int i = 0; i < pKF->mImage.card.size(); i++)
+    {
+        Card card = pKF->mImage.card.at(i);
+        MapPoint *pMP = new MapPoint(card,pKF->mImage.mCamera.camera2world(card.pose),card.card_id);
+        if(mMap.insertMapPoint(pMP,pKF,i) == false)//mapPoint在地图中已有
+            delete pMP;
+        
+        pKF->mpMapPoints.push_back(mMap.mpMapPoints.at(card.card_id));
+    }
+}
+
+void VSlam::VisCardInWorld(visualization_msgs::MarkerArray &markers)
+{
+    std::vector<MapPoint *> map_points = mMap.mpMapPoints;
     visualization_msgs::Marker marker;
     ROS_INFO_STREAM(map_points.size());
     for (int i = 0; i < map_points.size(); i++)
@@ -252,9 +307,9 @@ void CardDetection::VisCardInWorld(visualization_msgs::MarkerArray &markers)
         // pose.orientation.z = q.z();
         // pose.orientation.w = q.w();
 
-        pose.position.x = map_points.at(i).mWorldPositionPoint.x;
-        pose.position.y = map_points.at(i).mWorldPositionPoint.y;
-        pose.position.z = map_points.at(i).mWorldPositionPoint.z;
+        pose.position.x = map_points.at(i)->mWorldPositionPoint.x;
+        pose.position.y = map_points.at(i)->mWorldPositionPoint.y;
+        pose.position.z = map_points.at(i)->mWorldPositionPoint.z;
 
         marker.pose = pose;
         marker.header.stamp = ros::Time();
@@ -277,42 +332,48 @@ void CardDetection::VisCardInWorld(visualization_msgs::MarkerArray &markers)
     }
 }
 
-void CardDetection::detectDistance(Image &image)
+void VSlam::detectDistance(Image &image)
 {
-    for(int i = 0;i<image.card.size();i++)
+    for (int i = 0; i < image.card.size(); i++)
     {
-        Card card = image.card.at(i);
-        Eigen::Vector3d v[4];
-        for(int j = 0;j<4;j++)
-        {   
-            cv::Point2d point(card.key_points.at(j).x-1.0,card.key_points.at(j).y-1.0);
-            v[j] = image.mCamera.pixel2camera(point,mCameraParam,1);
+        Eigen::Vector3d v[5];
+        for (int j = 0; j < 4; j++)
+        {
+            v[j] = image.mCamera.pixel2camera(image.card.at(i).key_points.at(j), mCameraParam, 1);
         }
-        double width,height;
-        width = (v[1]-v[0]).x();
-        height = (v[2]-v[0]).y();
-        double depth = 0.7/height*1;
-        
-        cv::putText(m_CurrentImageMat, std::to_string(depth), card.key_points.at(3), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0));
-        //ROS_INFO_STREAM(depth);
+
+        v[4] = image.mCamera.pixel2camera(image.card.at(i).center, mCameraParam, 1);
+
+        double width, height;
+        width = (v[1] - v[0]).x();
+        height = (v[2] - v[0]).y();
+        double depth = 0.7 / height * 1;
+
+        ROS_INFO_STREAM(height / width);
+        image.card.at(i).pose(0, 0) = depth;
+        image.card.at(i).pose(1, 0) = depth * v[4].x();
+        image.card.at(i).pose(2, 0) = depth * v[4].y();
+
+        cv::putText(m_CurrentImageMat, std::to_string(image.card.at(i).pose(0, 0)), image.card.at(i).key_points.at(3), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0));
     }
 }
 
-void CardDetection::Undistort(const cv::Mat &input,cv::Mat &output)
+void VSlam::Undistort(const cv::Mat &input, cv::Mat &output)
 {
-    
 
     cv::Mat map1, map2;
     cv::Size imageSize;
     imageSize = input.size();
-    initUndistortRectifyMap(mCameraParam.setK, mCameraParam.setD(), cv::Mat(),
-    getOptimalNewCameraMatrix(mCameraParam.setK, mCameraParam.setD(), imageSize, 1, imageSize, 0),
-    imageSize, CV_16SC2, map1, map2);
+
+    //return the optimal new camera matrix
+    mCameraParam.mNewK = cv::getOptimalNewCameraMatrix(mCameraParam.mK, mCameraParam.mD, imageSize, 0);
+
+    cv::initUndistortRectifyMap(mCameraParam.mK, mCameraParam.mD, cv::Mat(),
+                                mCameraParam.mNewK, imageSize, CV_16SC2, map1, map2);
     cv::remap(input, output, map1, map2, cv::INTER_LINEAR);
 }
 
-
-// void CardDetection::triangulation(const Image &image1, const Image &image2, std::vector<MapPoint> &map_points)
+// void VSlam::triangulation(const Image &image1, const Image &image2, std::vector<MapPoint> &map_points)
 // {
 //     /* 方法一：不准 */
 //     std::vector<cv::Point2d> points1, points2;
@@ -386,7 +447,7 @@ void CardDetection::Undistort(const cv::Mat &input,cv::Mat &output)
 //     // }
 // }
 
-void CardDetection::publishVslam(vslam::Viz &viz)
+void VSlam::publishVslam(vslam::Viz &viz)
 {
     viz.header.frame_id = "odom";
     viz.header.stamp = ros::Time::now();
@@ -394,19 +455,19 @@ void CardDetection::publishVslam(vslam::Viz &viz)
     vslam::Card card;
     camera.camera_pose = m_CurrentPose;
     viz.camera = camera;
-    for (int i = 0; i < mMap.mMapPoints.size(); i++)
+    for (int i = 0; i < mMap.mpMapPoints.size(); i++)
     {
-        card.card_pose.position.x = mMap.mMapPoints.at(i).mWorldPositionPoint.x;
-        card.card_pose.position.y = mMap.mMapPoints.at(i).mWorldPositionPoint.y;
-        card.card_pose.position.z = mMap.mMapPoints.at(i).mWorldPositionPoint.z;
-        card.code_id = mMap.mMapPoints.at(i).mCard.code_id;
+        card.card_pose.position.x = mMap.mpMapPoints.at(i)->mWorldPositionPoint.x;
+        card.card_pose.position.y = mMap.mpMapPoints.at(i)->mWorldPositionPoint.y;
+        card.card_pose.position.z = mMap.mpMapPoints.at(i)->mWorldPositionPoint.z;
+        card.code_id = mMap.mpMapPoints.at(i)->mCard.code_id;
         card.card_id = i;
         viz.cards.push_back(card);
     }
     pub_slam.publish(viz);
 }
 
-void CardDetection::MainLoop()
+void VSlam::MainLoop()
 {
     ROS_INFO_STREAM("card_detection start");
     ros::Rate loop_rate(5);
@@ -499,7 +560,7 @@ void CardDetection::MainLoop()
         // pub_MarkerRviz.publish(markers);
 
         //debug
-        cv::imshow("Control", image);
+        cv::imshow("Control", m_CurrentImageMat);
         cv::waitKey(1);
 
         // loop_rate.sleep();

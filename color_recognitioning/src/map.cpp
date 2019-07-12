@@ -2,39 +2,55 @@
  * @Author: fengkai 
  * @Date: 2019-06-25 10:45:13 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-06-25 22:28:57
+ * @Last Modified time: 2019-07-12 16:12:26
  */
 #include "map.h"
 
-SlamMap::SlamMap()
+Map::Map()
+{
+    std::vector<KeyFrame *> kf(512, nullptr);
+    mpKeyFrames = kf;
+
+    std::vector<MapPoint *> mp(128, nullptr);
+    mpMapPoints = mp;
+}
+
+Map::~Map()
 {
 }
 
-SlamMap::~SlamMap()
+bool Map::insertKeyFrame(KeyFrame *pKF)
 {
-    
+    mpKeyFrames.at(pKF->mKeyFrameId) = pKF;
+    return true;
+}
+bool Map::insertMapPoint(MapPoint *pMP, KeyFrame *pKF, const int &n)
+{
+    if (mpMapPoints.at(pMP->mMapPointId) == nullptr)
+    {
+        mpMapPoints.at(pMP->mMapPointId) = pMP;
+        return true;
+    }
+    else
+    {
+        mpMapPoints.at(pMP->mMapPointId)->setRefKeyFrame(pKF, n);
+        return false;
+    }
 }
 
-// void SlamMap::insertKeyFrame(KeyFrame *pKF)
-// {
-//     mspKeyFrames.insert(pKF);
-// }
-// void SlamMap::insertMapPoint(MapPoint *pMP)
-// {
-//     mspMapPoints.insert(pMP);
-// }
+void Map::eraseKeyFrame(KeyFrame *pKF)
+{
+    delete mpKeyFrames.at(pKF->mKeyFrameId);
+    mpKeyFrames.at(pKF->mKeyFrameId) = nullptr;
+}
 
-// void SlamMap::eraseKeyFrame(KeyFrame *pKF)
-// {
-//     mspKeyFrames.erase(pKF);
-// }
+void Map::eraseMapPoint(MapPoint *pMP)
+{
+    delete mpMapPoints.at(pMP->mMapPointId);
+    mpMapPoints.at(pMP->mMapPointId) = nullptr;
+}
 
-// void SlamMap::eraseMapPoint(MapPoint *pMP)
-// {
-//     mspMapPoints.erase(pMP);
-// }
-
-// void SlamMap::getMapPoints()
+// void Map::getMapPoints()
 // {
 //     std::set<MapPoint>::iterator iter = mspMapPoints.begin();
 //     for(;iter != mspMapPoints.end();iter++)

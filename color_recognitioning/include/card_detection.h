@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:32 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-06-27 10:21:06
+ * @Last Modified time: 2019-07-12 16:03:48
  */
 
 #ifndef CARD_DETECTION_H
@@ -50,11 +50,11 @@ struct DetectionParam
 
 };
 
-class CardDetection
+class VSlam
 {
     public:
-        CardDetection();
-        ~CardDetection();
+        VSlam();
+        VSlam();
 
         ros::NodeHandle nh_;
         ros::NodeHandle pnh_;
@@ -72,20 +72,20 @@ class CardDetection
         bool bInit;//初始化
 
         cv::Mat m_CurrentImageMat;
-        cv::Mat image;
+        cv::Mat m_ImageRawMat;
         Image m_CurrentImage;
         Image m_LastImage;
         geometry_msgs::Pose m_CurrentPose;
 
-        KeyFrame m_CurrentKeyFrame;
-        KeyFrame m_RefKeyFrame;
+        KeyFrame *mp_CurrentKeyFrame;
+        KeyFrame *mp_RefKeyFrame;
         
         int m_CountImageId;
         int m_CountKeyFrameId;
         DetectionParam mParam;//参数
         CameraParam mCameraParam;//相机参数
 
-        SlamMap mMap;
+        Map mMap;
 
         void callbackGetImage(const sensor_msgs::ImageConstPtr &msg);
         void callbackGetOdom(const nav_msgs::OdometryConstPtr &msg);
@@ -94,7 +94,11 @@ class CardDetection
         void publishVslam(vslam::Viz &viz);
         void detectDistance(Image &image);
         void Undistort(const cv::Mat &input,cv::Mat &output);
-       
+        void cardDetection(cv::Mat &mat,Image &image);
+        
+        void setKeyFrame(const Image &img,KeyFrame *kf_cur,KeyFrame *kf_ref);
+        void setCameraPose(KeyFrame *mKF);
+        void setMapPoint(KeyFrame *mKF);
         void initROS();
         void MainLoop();
 

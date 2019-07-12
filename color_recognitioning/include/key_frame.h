@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-25 22:13:43 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-06-25 22:23:59
+ * @Last Modified time: 2019-07-12 16:12:12
  */
 #ifndef KEY_FRAME_H
 #define KEY_FRAME_H
@@ -21,9 +21,8 @@ public:
     KeyFrame();
     KeyFrame(const Image &image,const int &key_frame_id);
 
-    void SetPose(const cv::Mat &Twc);
+    void setPose(const cv::Mat &Twc);
     //std::vector<MapPoint> GetMapPoints();
-    //void SetMapPoints();
     //void UpdatePoseMatrices();
 
     int mKeyFrameId;
@@ -33,8 +32,10 @@ public:
 
     KeyFrame *refKeyFrame;
 
-    std::vector<MapPoint> mMapPoints;
+    std::vector<MapPoint *> mpMapPoints;
 
+    int getMapPointCount();
+    void setRefMapPoints(MapPoint *mMP);
 
     // SE3 Pose and camera center
 

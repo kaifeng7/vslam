@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-25 22:13:31 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-06-25 22:30:11
+ * @Last Modified time: 2019-07-12 16:12:07
  */
 #include "key_frame.h"
 
@@ -12,6 +12,7 @@ KeyFrame::KeyFrame()
 
 KeyFrame::KeyFrame(const Image &image,const int &key_frame_id) :mImage(image),mKeyFrameId(key_frame_id)
 {
+    mpMapPoints.clear();
 }
 
 // void KeyFrame::SetPose(const cv::Mat &Twc)
@@ -35,12 +36,12 @@ KeyFrame::KeyFrame(const Image &image,const int &key_frame_id) :mImage(image),mK
 //     }
 // }
 
-// void KeyFrame::SetMapPoints()
-// {
-//     for(int i=0;i<mImage.card.size();i++)
-//     {
-//         MapPoint map_points;
-//         map_points.mCard = mImage.card.at(i);
-//         mMapPoints.push_back(map_points);
-//     }
-// }
+void KeyFrame::setRefMapPoints(MapPoint* mMP)
+{
+    mpMapPoints.push_back(mMP)
+}
+
+int KeyFrame::getMapPointCount()
+{   
+    return (mpMapPoints.size());
+}

@@ -1,17 +1,27 @@
-maxRectArea: 800
+maxRectArea: 2000
 minRectArea: 80
 
-fx: 1136.8
-fy: 1128.8
-cx: 543.1
-cy: 472.9
+# fx: 1136.8
+# fy: 1128.8
+# cx: 543.1
+# cy: 472.9
 
-k1: -0.2761 
-k2: 0.0525
+# k1: -0.2761 
+# k2: 0.0525
+# k3: 0
+# p1: 0
+# p2: 0
+
+fx: 926.29
+fy: 872.75
+cx: 610.19
+cy: 376.97
+
+k1: -0.3774 
+k2: 0.1367
 k3: 0
 p1: 0
 p2: 0
-
 
 
 maxRedH: 180
@@ -27,3 +37,4 @@ maxBlueS: 255
 minBlueS: 125
 maxBlueV: 255
 minBlueV: 32
+
