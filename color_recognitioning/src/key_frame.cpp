@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-25 22:13:31 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-07-12 16:12:07
+ * @Last Modified time: 2019-07-18 14:42:53
  */
 #include "key_frame.h"
 
@@ -38,7 +38,7 @@ KeyFrame::KeyFrame(const Image &image,const int &key_frame_id) :mImage(image),mK
 
 void KeyFrame::setRefMapPoints(MapPoint* mMP)
 {
-    mpMapPoints.push_back(mMP)
+    mpMapPoints.push_back(mMP);
 }
 
 int KeyFrame::getMapPointCount()

@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-25 10:35:48 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-06-27 10:21:00
+ * @Last Modified time: 2019-07-19 18:48:12
  */
 #ifndef CARD_H
 #define CARD_H
@@ -18,29 +18,35 @@
 struct Card
 {
     std::vector<cv::Point2i> key_points;
-    cv::Point2i center;
+    cv::Point2i center;//相对位置
     int width,height;
     std::string code_id;
     int card_id;
-    Eigen::Vector3d pose;
+    Eigen::Vector3d pose; //绝对位置
     int code2card(const std::string &str)
     {
         int sum = 0;
-        for(int i=0;i<str.size()-1;i++)
+        for(int i=0;i<str.size();i++)
         {
             sum*=2;
             sum += (str.at(i)-'0');
         }
-        return card_id;
+        return sum;
     }
+};
+
+struct ImagePart
+{
+    std::vector<Card> cards;
+    Camera mCamera;
 };
 
 struct Image
 {
-    std::vector<Card> card;
-    Eigen::Matrix<double,3,4> pose;
+
+    Eigen::Matrix<double,3,4> pose;//车的位姿
     int image_id;
-    Camera mCamera;
+    std::vector<ImagePart> image_parts;//0.left 1.front
 };
 
 

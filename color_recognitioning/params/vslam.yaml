@@ -1,28 +1,35 @@
 maxRectArea: 2000
 minRectArea: 80
 
-# fx: 1136.8
-# fy: 1128.8
-# cx: 543.1
-# cy: 472.9
+#left camera
+left_fx: 922.29
+left_fy: 922.75
+left_cx: 614.19
+left_cy: 384.97
 
-# k1: -0.2761 
-# k2: 0.0525
-# k3: 0
-# p1: 0
-# p2: 0
+left_k1: -0.3774 
+left_k2: 0.1367
+left_k3: 0
+left_p1: 0
+left_p2: 0
 
-fx: 926.29
-fy: 872.75
-cx: 610.19
-cy: 376.97
+left_width: 720
+left_heigth: 1280
 
-k1: -0.3774 
-k2: 0.1367
-k3: 0
-p1: 0
-p2: 0
+#front camera
+front_fx: 914.29
+front_fy: 912.78
+front_cx: 596.25
+front_cy: 312.95
 
+front_k1: -0.3916 
+front_k2: 0.1466
+front_k3: 0
+front_p1: 0
+front_p2: 0
+
+front_width: 720
+front_heigth: 1280
 
 maxRedH: 180
 minRedH: 156

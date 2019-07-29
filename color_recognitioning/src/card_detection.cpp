@@ -2,14 +2,14 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:30 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-07-12 16:46:59
+ * @Last Modified time: 2019-07-20 16:53:01
  */
 
 #include "card_detection.h"
 
-VSlam::VSlam() : pnh_("~"), bImage(false), bOdom(false), bInit(false), 
+VSlam::VSlam() : pnh_("~"), bImage(false), bOdom(false), bInit(false),
                  m_CountImageId(0), m_CountKeyFrameId(0),
-                 mp_CurrentKeyFrame(nullptr),mp_RefKeyFrame(nullptr)
+                 mp_CurrentKeyFrame(nullptr), mp_RefKeyFrame(nullptr)
 {
     initROS();
 }
@@ -25,21 +25,39 @@ void VSlam::initROS()
     pub_MarkerRviz = nh_.advertise<visualization_msgs::MarkerArray>("/marker_rviz", 10);
     pub_slam = nh_.advertise<vslam::Viz>("/slam_viz", 10);
 
-    sub_Image = nh_.subscribe("/camera/image_raw", 1, &VSlam::callbackGetImage, this);
+    sub_ImageLeft = new message_filters::Subscriber<sensor_msgs::Image>(nh_, "/usb_cam1/image_raw", 1);
+    sub_ImageFront = new message_filters::Subscriber<sensor_msgs::Image>(nh_, "/usb_cam2/image_raw", 1);
+    sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *sub_ImageLeft, *sub_ImageFront);
+    sync->registerCallback(std::bind(&VSlam::callbackGetImage, this, _1, _2));
+
     sub_Odom = nh_.subscribe("/odom/imu", 10, &VSlam::callbackGetOdom, this);
 
     pnh_.param<int>("maxRectArea", mParam.max_area, 0);
     pnh_.param<int>("minRectArea", mParam.min_area, 0);
 
-    pnh_.param<double>("fx", mCameraParam.fx, 0);
-    pnh_.param<double>("fy", mCameraParam.fy, 0);
-    pnh_.param<double>("cx", mCameraParam.cx, 0);
-    pnh_.param<double>("cy", mCameraParam.cy, 0);
-    pnh_.param<double>("k1", mCameraParam.k1, 0);
-    pnh_.param<double>("k2", mCameraParam.k2, 0);
-    pnh_.param<double>("k3", mCameraParam.k3, 0);
-    pnh_.param<double>("p1", mCameraParam.p1, 0);
-    pnh_.param<double>("p2", mCameraParam.p2, 0);
+    pnh_.param<double>("left_fx", mCameraParamLeft.fx, 0);
+    pnh_.param<double>("left_fy", mCameraParamLeft.fy, 0);
+    pnh_.param<double>("left_cx", mCameraParamLeft.cx, 0);
+    pnh_.param<double>("left_cy", mCameraParamLeft.cy, 0);
+    pnh_.param<double>("left_k1", mCameraParamLeft.k1, 0);
+    pnh_.param<double>("left_k2", mCameraParamLeft.k2, 0);
+    pnh_.param<double>("left_k3", mCameraParamLeft.k3, 0);
+    pnh_.param<double>("left_p1", mCameraParamLeft.p1, 0);
+    pnh_.param<double>("left_p2", mCameraParamLeft.p2, 0);
+    pnh_.param<int>("left_width", mCameraParamLeft.width, 0);
+    pnh_.param<int>("left_height", mCameraParamLeft.height, 0);
+
+    pnh_.param<double>("front_fx", mCameraParamFront.fx, 0);
+    pnh_.param<double>("front_fy", mCameraParamFront.fy, 0);
+    pnh_.param<double>("front_cx", mCameraParamFront.cx, 0);
+    pnh_.param<double>("front_cy", mCameraParamFront.cy, 0);
+    pnh_.param<double>("front_k1", mCameraParamFront.k1, 0);
+    pnh_.param<double>("front_k2", mCameraParamFront.k2, 0);
+    pnh_.param<double>("front_k3", mCameraParamFront.k3, 0);
+    pnh_.param<double>("front_p1", mCameraParamFront.p1, 0);
+    pnh_.param<double>("front_p2", mCameraParamFront.p2, 0);
+    pnh_.param<int>("front_width", mCameraParamFront.width, 0);
+    pnh_.param<int>("front_height", mCameraParamFront.height, 0);
 
     pnh_.param<int>("maxRedH", mParam.max_red_h, 0);
     pnh_.param<int>("minRedH", mParam.min_red_h, 0);
@@ -55,8 +73,8 @@ void VSlam::initROS()
     pnh_.param<int>("maxBlueV", mParam.max_blue_v, 0);
     pnh_.param<int>("minBlueV", mParam.min_blue_v, 0);
 
-    mCameraParam.setK();
-    mCameraParam.setD();
+    mCameraParamLeft.preProcess();
+    mCameraParamFront.preProcess();
 }
 
 void VSlam::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
@@ -65,13 +83,32 @@ void VSlam::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
     m_CurrentPose = msg->pose.pose;
 }
 
-void VSlam::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
+void VSlam::callbackGetImage(const sensor_msgs::ImageConstPtr &msg_left,const sensor_msgs::ImageConstPtr &msg_front)
+{
+    m_CountImageId++;
+    bImage = true;
+
+    m_CurrentImage = Image();
+    processPicture(m_CurrentImageMat[0],m_CurrentImage,msg_left,1);
+    processPicture(m_CurrentImageMat[1],m_CurrentImage,msg_front,2);
+
+
+    if (isKeyPoint(m_CurrentImage))
+    {
+        mp_CurrentKeyFrame = new KeyFrame();
+        setKeyFrame(m_CurrentImage, mp_CurrentKeyFrame, mp_RefKeyFrame);
+    }
+
+    
+}
+
+void VSlam::processPicture(cv::Mat &mat_cur, Image &image, const sensor_msgs::ImageConstPtr &msg, const int &flag)
 {
     cv_bridge::CvImagePtr cv_ptr;
     cv_bridge::CvImagePtr pub_ptr;
+    cv::Mat mat_raw;
     try
     {
-        bImage = true;
         cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
         pub_ptr = cv_ptr;
     }
@@ -81,9 +118,19 @@ void VSlam::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
         return;
     }
 
-    m_ImageRawMat = cv_ptr->image;
+    mat_raw = cv_ptr->image;
 
-    Undistort(m_ImageRawMat, m_CurrentImageMat);
+    switch (flag)
+    {
+    case 1:
+        cv::remap(mat_raw, mat_cur, mCameraParamLeft.map1, mCameraParamLeft.map2, cv::INTER_LINEAR);
+        break;
+    case 2:
+        cv::remap(mat_raw, mat_cur, mCameraParamFront.map1, mCameraParamFront.map2, cv::INTER_LINEAR);
+        break;
+    default:
+        break;
+    }
 
     //Eigen::Quaterniond quat(m_CurrentPose.orientation.w, m_CurrentPose.orientation.x, m_CurrentPose.orientation.y, m_CurrentPose.orientation.z);
     //Eigen::Vector3d t(m_CurrentPose.position.x, m_CurrentPose.position.y, m_CurrentPose.position.z);
@@ -95,26 +142,35 @@ void VSlam::callbackGetImage(const sensor_msgs::ImageConstPtr &msg)
     //     r(1, 0), r(1, 1), r(1, 2), t(1, 0),
     //     r(2, 0), r(2, 1), r(2, 2), t(2, 0);
 
-    m_CurrentImage.image_id = m_CountImageId++;
-    m_CurrentImage.card.clear();
+    cardDetection(m_CurrentImageMat[flag - 1], m_CurrentImage, flag);
+    detectDistance(m_CurrentImage, flag);
 
-    cardDetection(m_CurrentImageMat, m_CurrentImage);
-    detectDistance(m_CurrentImage);
-    
-    if(m_CurrentImage.card.size()>1)
-    {
-        mp_CurrentKeyFrame = new KeyFrame();
-        setKeyFrame(m_CurrentImage, mp_CurrentKeyFrame, mp_RefKeyFrame);
-    }
-
-
-
-    pub_ptr->image = m_CurrentImageMat;
+    //pub_ptr->image = m_CurrentImageMat;
     //m_CurrentImageMat = imgThresholdedRed;
-    pub_DetectedImageRviz.publish(pub_ptr->toImageMsg());
+    //pub_DetectedImageRviz.publish(pub_ptr->toImageMsg());
 }
 
-void VSlam::cardDetection(cv::Mat &mat, Image &image)
+bool VSlam::isKeyPoint(const Image &image)
+{
+    int Count = 0;
+    for (int i = 0; i < image.image_parts.size(); i++)
+    {
+        Count += image.image_parts.size();
+    }
+    if (Count > 1)
+        return true;
+    else
+    {
+        return false;
+    }
+}
+
+double VSlam::distance2(const double &x, const double &y)
+{
+    return (x * x + y * y);
+}
+
+void VSlam::cardDetection(cv::Mat &mat, Image &image, const int &flag)
 {
     cv::Mat imgHSV;
     std::vector<cv::Mat> splitHSV;
@@ -228,12 +284,11 @@ void VSlam::cardDetection(cv::Mat &mat, Image &image)
 
                     rb = cv::Point2i(rect.x + rect.width, rect.y + rect.height);
                     card.key_points.push_back(rb);
-                    image.card.push_back(card);
+                    image.image_parts.at(flag - 1).cards.push_back(card);
 
                     cv::rectangle(mat, rect, cv::Scalar(0, 0, 255));
                     cv::putText(mat, code_id, card.center, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 255));
                     cv::putText(mat, std::to_string(card.card_id), card.key_points.at(1), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 0, 255));
-
                 }
             }
         }
@@ -242,44 +297,50 @@ void VSlam::cardDetection(cv::Mat &mat, Image &image)
 
 void VSlam::setKeyFrame(const Image &img, KeyFrame *kf_cur, KeyFrame *kf_ref)
 {
-        kf_ref = kf_cur;
-    
-        kf_cur = new KeyFrame(img,m_CountKeyFrameId++);
-        kf_cur->refKeyFrame = kf_ref;
+    kf_ref = kf_cur;
 
-        mMap.insertKeyFrame(kf_cur);
+    kf_cur = new KeyFrame(img, m_CountKeyFrameId++);
+    kf_cur->refKeyFrame = kf_ref;
+
+    mMap.insertKeyFrame(kf_cur);
 }
 
-void VSlam::setCameraPose(KeyFrame *kf)
+void VSlam::setCameraPose(KeyFrame *pKF)
 {
-    if (kf.mKeyFrameId == 0)
+    if (pKF->mKeyFrameId == 0)
     {
         Eigen::Matrix3d r = Eigen::Matrix3d::Identity();
         Eigen::Vector3d t = Eigen::Vector3d::Zero();
         Sophus::SE3d se3(r, t);
-        m_CurrentImage.mCamera.mTwc = se3;
-        m_CurrentImage.pose << r(0, 0), r(0, 1), r(0, 2), t(0, 0),
+
+        //pKF->mImage.mCamera.mTwc = se3;
+        pKF->mImage.pose << r(0, 0), r(0, 1), r(0, 2), t(0, 0),
             r(1, 0), r(1, 1), r(1, 2), t(1, 0),
             r(2, 0), r(2, 1), r(2, 2), t(2, 0);
         return;
     }
     else
     {
-        for(int i = 0;i<m_Current)
+        for (int i = 0; i < pKF->mpMapPoints.size(); i++)
+        {
+            //pKF->mImage.mCamera.world2camera(pKF->mpMapPoints.at(i)->mWorldPositionPoint);
+        }
     }
-    
 }
 
 void VSlam::setMapPoint(KeyFrame *pKF)
 {
-    for (int i = 0; i < pKF->mImage.card.size(); i++)
+    for (int i = 0; i < pKF->mImage.image_parts.size(); i++)
     {
-        Card card = pKF->mImage.card.at(i);
-        MapPoint *pMP = new MapPoint(card,pKF->mImage.mCamera.camera2world(card.pose),card.card_id);
-        if(mMap.insertMapPoint(pMP,pKF,i) == false)//mapPoint在地图中已有
-            delete pMP;
-        
-        pKF->mpMapPoints.push_back(mMap.mpMapPoints.at(card.card_id));
+        for (int j = 0; j < pKF->mImage.image_parts.at(i).cards.size(); i++)
+        {
+            Card card = pKF->mImage.image_parts.at(i).cards.at(i);
+            MapPoint *pMP = new MapPoint(card, pKF->mImage.image_parts.at(i).mCamera.camera2world(card.pose), card.card_id);
+            if (mMap.insertMapPoint(pMP, pKF, i) == false) //mapPoint在地图中已有
+                delete pMP;
+
+            pKF->mpMapPoints.push_back(mMap.mpMapPoints.at(card.card_id));
+        }
     }
 }
 
@@ -307,9 +368,9 @@ void VSlam::VisCardInWorld(visualization_msgs::MarkerArray &markers)
         // pose.orientation.z = q.z();
         // pose.orientation.w = q.w();
 
-        pose.position.x = map_points.at(i)->mWorldPositionPoint.x;
-        pose.position.y = map_points.at(i)->mWorldPositionPoint.y;
-        pose.position.z = map_points.at(i)->mWorldPositionPoint.z;
+        pose.position.x = map_points.at(i)->mWorldPositionPoint.x();
+        pose.position.y = map_points.at(i)->mWorldPositionPoint.y();
+        pose.position.z = map_points.at(i)->mWorldPositionPoint.z();
 
         marker.pose = pose;
         marker.header.stamp = ros::Time();
@@ -332,17 +393,29 @@ void VSlam::VisCardInWorld(visualization_msgs::MarkerArray &markers)
     }
 }
 
-void VSlam::detectDistance(Image &image)
+void VSlam::detectDistance(Image &image, const int &flag)
 {
-    for (int i = 0; i < image.card.size(); i++)
+    for (int i = 0; i < image.image_parts.at(flag - 1).cards.size(); i++)
     {
         Eigen::Vector3d v[5];
+        CameraParam camera_param;
+        switch (flag)
+        {
+        case 1:
+            camera_param = mCameraParamLeft;
+            break;
+        case 2:
+            camera_param = mCameraParamFront;
+            break;
+        default:
+            break;
+        }
         for (int j = 0; j < 4; j++)
         {
-            v[j] = image.mCamera.pixel2camera(image.card.at(i).key_points.at(j), mCameraParam, 1);
+            v[j] = image.image_parts.at(flag - 1).mCamera.pixel2camera(image.image_parts.at(flag - 1).cards.at(i).key_points.at(j), camera_param, 1);
         }
 
-        v[4] = image.mCamera.pixel2camera(image.card.at(i).center, mCameraParam, 1);
+        v[4] = image.image_parts.at(flag - 1).mCamera.pixel2camera(image.image_parts.at(flag - 1).cards.at(i).center, camera_param, 1);
 
         double width, height;
         width = (v[1] - v[0]).x();
@@ -350,27 +423,11 @@ void VSlam::detectDistance(Image &image)
         double depth = 0.7 / height * 1;
 
         ROS_INFO_STREAM(height / width);
-        image.card.at(i).pose(0, 0) = depth;
-        image.card.at(i).pose(1, 0) = depth * v[4].x();
-        image.card.at(i).pose(2, 0) = depth * v[4].y();
-
-        cv::putText(m_CurrentImageMat, std::to_string(image.card.at(i).pose(0, 0)), image.card.at(i).key_points.at(3), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0));
+        image.image_parts.at(flag - 1).cards.at(i).pose(0, 0) = depth;
+        image.image_parts.at(flag - 1).cards.at(i).pose(1, 0) = depth * v[4].x();
+        image.image_parts.at(flag - 1).cards.at(i).pose(2, 0) = depth * v[4].y();
+        cv::putText(m_CurrentImageMat[flag - 1], std::to_string(image.image_parts.at(flag - 1).cards.at(i).pose(0, 0)), image.image_parts.at(flag - 1).cards.at(i).key_points.at(3), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0));
     }
-}
-
-void VSlam::Undistort(const cv::Mat &input, cv::Mat &output)
-{
-
-    cv::Mat map1, map2;
-    cv::Size imageSize;
-    imageSize = input.size();
-
-    //return the optimal new camera matrix
-    mCameraParam.mNewK = cv::getOptimalNewCameraMatrix(mCameraParam.mK, mCameraParam.mD, imageSize, 0);
-
-    cv::initUndistortRectifyMap(mCameraParam.mK, mCameraParam.mD, cv::Mat(),
-                                mCameraParam.mNewK, imageSize, CV_16SC2, map1, map2);
-    cv::remap(input, output, map1, map2, cv::INTER_LINEAR);
 }
 
 // void VSlam::triangulation(const Image &image1, const Image &image2, std::vector<MapPoint> &map_points)
@@ -457,9 +514,9 @@ void VSlam::publishVslam(vslam::Viz &viz)
     viz.camera = camera;
     for (int i = 0; i < mMap.mpMapPoints.size(); i++)
     {
-        card.card_pose.position.x = mMap.mpMapPoints.at(i)->mWorldPositionPoint.x;
-        card.card_pose.position.y = mMap.mpMapPoints.at(i)->mWorldPositionPoint.y;
-        card.card_pose.position.z = mMap.mpMapPoints.at(i)->mWorldPositionPoint.z;
+        card.card_pose.position.x = mMap.mpMapPoints.at(i)->mWorldPositionPoint.x();
+        card.card_pose.position.y = mMap.mpMapPoints.at(i)->mWorldPositionPoint.y();
+        card.card_pose.position.z = mMap.mpMapPoints.at(i)->mWorldPositionPoint.z();
         card.code_id = mMap.mpMapPoints.at(i)->mCard.code_id;
         card.card_id = i;
         viz.cards.push_back(card);
@@ -560,7 +617,9 @@ void VSlam::MainLoop()
         // pub_MarkerRviz.publish(markers);
 
         //debug
-        cv::imshow("Control", m_CurrentImageMat);
+        cv::imshow("left", m_CurrentImageMat[0]);
+        cv::imshow("front", m_CurrentImageMat[1]);
+
         cv::waitKey(1);
 
         // loop_rate.sleep();

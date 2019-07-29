@@ -12,9 +12,9 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/eigen.hpp>
 
-class CameraParam
+struct CameraParam
 {
-public:
+    int width, height;
     cv::Mat mK; //内参矩阵
     cv::Mat mNewK;
     double fx, fy, cx, cy;
@@ -22,6 +22,10 @@ public:
     double k1, k2, k3, p1, p2;
     void setK();
     void setD();
+    cv::Mat map1, map2;
+    void Undistort();
+    void preProcess();
+
 };
 
 class Camera

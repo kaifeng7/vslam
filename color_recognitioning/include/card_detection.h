@@ -2,13 +2,17 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:32 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-07-12 16:03:48
+ * @Last Modified time: 2019-07-19 16:57:07
  */
 
 #ifndef CARD_DETECTION_H
 #define CARD_DETECTION_H
 
 #include <ros/ros.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/Image.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -54,11 +58,14 @@ class VSlam
 {
     public:
         VSlam();
-        VSlam();
+        ~VSlam();
 
         ros::NodeHandle nh_;
         ros::NodeHandle pnh_;
-
+        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image,sensor_msgs::Image> SyncPolicy;
+        message_filters::Subscriber<sensor_msgs::Image> *sub_ImageLeft;
+        message_filters::Subscriber<sensor_msgs::Image> *sub_ImageFront;
+        message_filters::Synchronizer<SyncPolicy> *sync; 
         ros::Subscriber sub_Image;
         ros::Subscriber sub_Odom;
 
@@ -71,8 +78,8 @@ class VSlam
         bool bOdom;
         bool bInit;//初始化
 
-        cv::Mat m_CurrentImageMat;
-        cv::Mat m_ImageRawMat;
+        cv::Mat m_CurrentImageMat[2];
+        cv::Mat m_ImageRawMat[2];
         Image m_CurrentImage;
         Image m_LastImage;
         geometry_msgs::Pose m_CurrentPose;
@@ -83,19 +90,27 @@ class VSlam
         int m_CountImageId;
         int m_CountKeyFrameId;
         DetectionParam mParam;//参数
-        CameraParam mCameraParam;//相机参数
+        CameraParam mCameraParamLeft;//相机参数
+        CameraParam mCameraParamFront;//相机参数
+
 
         Map mMap;
 
-        void callbackGetImage(const sensor_msgs::ImageConstPtr &msg);
+        void callbackGetImage(const sensor_msgs::ImageConstPtr &msg_left,const sensor_msgs::ImageConstPtr &msg_front);
+    
         void callbackGetOdom(const nav_msgs::OdometryConstPtr &msg);
         void triangulation(const Image& image1,const Image& image2,std::vector<MapPoint> &map_points);
         void VisCardInWorld(visualization_msgs::MarkerArray &markers);
         void publishVslam(vslam::Viz &viz);
-        void detectDistance(Image &image);
         void Undistort(const cv::Mat &input,cv::Mat &output);
-        void cardDetection(cv::Mat &mat,Image &image);
-        
+
+        double distance2(const double &x,const double &y);       
+        void detectDistance(Image &image,const int &flag);
+        void cardDetection(cv::Mat &mat, Image &image,const int &flag);
+
+        void processPicture(cv::Mat &mat_cur,Image &image,const sensor_msgs::ImageConstPtr &msg,const int &flag);
+
+        bool isKeyPoint(const Image &image);
         void setKeyFrame(const Image &img,KeyFrame *kf_cur,KeyFrame *kf_ref);
         void setCameraPose(KeyFrame *mKF);
         void setMapPoint(KeyFrame *mKF);

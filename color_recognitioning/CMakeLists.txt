@@ -8,8 +8,8 @@ project(vslam)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 
-#set (Eigen_DIRS "/usr/include/eigen3")
 set (CMAKE_CXX_FLAGS "-std=c++11")
+list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules )
 
 find_package(catkin REQUIRED COMPONENTS
     roscpp
@@ -26,6 +26,8 @@ find_package(OpenCV 3 REQUIRED)
 find_package(Sophus REQUIRED)
 
 find_package(Eigen3 REQUIRED)
+
+find_package(G2O REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -60,7 +62,7 @@ include_directories(
     include
     ${catkin_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
-
+    ${G2O_INCLUDE_DIRS}
     ${Sophus_INCLUDE_DIRS}
     #${EIGEN3_INCLUDE_DIRS}
     "/usr/local/include/eigen3"
@@ -78,6 +80,7 @@ add_executable(vslam_node src/card_detection.cpp
                           src/key_frame.cpp
                           src/map_point.cpp
                           src/map.cpp
+                          #src/g2o.cpp
                           )
 
 ## Rename C++ executable without prefix
@@ -92,7 +95,8 @@ add_executable(vslam_node src/card_detection.cpp
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(vslam_node ${catkin_LIBRARIES} 
-                                                ${Sophus_LIBRARIES}
-                                                ${OpenCV_LIBS}
+                                 ${Sophus_LIBRARIES}
+                                 ${OpenCV_LIBS}
+                                 g2o_core g2o_stuff
                                                 )
 
