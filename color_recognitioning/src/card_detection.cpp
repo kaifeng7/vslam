@@ -28,7 +28,7 @@ void VSlam::initROS()
     sub_ImageLeft = new message_filters::Subscriber<sensor_msgs::Image>(nh_, "/usb_cam1/image_raw", 1);
     sub_ImageFront = new message_filters::Subscriber<sensor_msgs::Image>(nh_, "/usb_cam2/image_raw", 1);
     sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *sub_ImageLeft, *sub_ImageFront);
-    sync->registerCallback(std::bind(&VSlam::callbackGetImage, this, _1, _2));
+    sync->registerCallback(boost::bind(&VSlam::callbackGetImage, this, _1, _2));
 
     sub_Odom = nh_.subscribe("/odom/imu", 10, &VSlam::callbackGetOdom, this);
 
@@ -73,8 +73,11 @@ void VSlam::initROS()
     pnh_.param<int>("maxBlueV", mParam.max_blue_v, 0);
     pnh_.param<int>("minBlueV", mParam.min_blue_v, 0);
 
+
     mCameraParamLeft.preProcess();
     mCameraParamFront.preProcess();
+    
+
 }
 
 void VSlam::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
@@ -155,8 +158,10 @@ bool VSlam::isKeyPoint(const Image &image)
     int Count = 0;
     for (int i = 0; i < image.image_parts.size(); i++)
     {
-        Count += image.image_parts.size();
-    }
+        Count += image.image_parts.at(i).cards.size();
+    }   
+    
+
     if (Count > 1)
         return true;
     else
@@ -264,7 +269,7 @@ void VSlam::cardDetection(cv::Mat &mat, Image &image, const int &flag)
                 }
                 if (flag_2 == false && code_id != "1111111" && code_id != "0000000")
                 {
-                    ROS_INFO_STREAM(code_id);
+                    //ROS_INFO_STREAM(code_id);
                     Card card;
                     card.code_id = code_id;
                     card.width = rect.width;
@@ -422,7 +427,6 @@ void VSlam::detectDistance(Image &image, const int &flag)
         height = (v[2] - v[0]).y();
         double depth = 0.7 / height * 1;
 
-        ROS_INFO_STREAM(height / width);
         image.image_parts.at(flag - 1).cards.at(i).pose(0, 0) = depth;
         image.image_parts.at(flag - 1).cards.at(i).pose(1, 0) = depth * v[4].x();
         image.image_parts.at(flag - 1).cards.at(i).pose(2, 0) = depth * v[4].y();

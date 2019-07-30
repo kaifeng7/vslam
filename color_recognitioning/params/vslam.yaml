@@ -1,4 +1,4 @@
-maxRectArea: 2000
+maxRectArea: 20000
 minRectArea: 80
 
 #left camera
@@ -14,7 +14,7 @@ left_p1: 0
 left_p2: 0
 
 left_width: 720
-left_heigth: 1280
+left_height: 1280
 
 #front camera
 front_fx: 914.29
@@ -29,7 +29,7 @@ front_p1: 0
 front_p2: 0
 
 front_width: 720
-front_heigth: 1280
+front_height: 1280
 
 maxRedH: 180
 minRedH: 156

@@ -53,9 +53,10 @@ void CameraParam::setD()
     mD = (cv::Mat_<double>(5, 1) << k1, k2, p1, p2, k3);
 }
 
+
 void CameraParam::Undistort()
 {
-    cv::Size imageSize(width, height);
+    cv::Size imageSize(height,width);
 
     //return the optimal new camera matrix
     mNewK = cv::getOptimalNewCameraMatrix(mK, mD, imageSize, 0);

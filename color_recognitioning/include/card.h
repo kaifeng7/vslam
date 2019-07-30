@@ -47,6 +47,12 @@ struct Image
     Eigen::Matrix<double,3,4> pose;//车的位姿
     int image_id;
     std::vector<ImagePart> image_parts;//0.left 1.front
+
+    Image()
+    {
+        for(int i = 0;i<2;i++)
+            image_parts.push_back(ImagePart());
+    }
 };
 
 

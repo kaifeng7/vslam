@@ -8,7 +8,7 @@
 
 Map::Map()
 {
-    std::vector<KeyFrame *> kf(512, nullptr);
+    std::vector<KeyFrame *> kf(5120, nullptr);
     mpKeyFrames = kf;
 
     std::vector<MapPoint *> mp(128, nullptr);
