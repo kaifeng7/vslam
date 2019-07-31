@@ -45,3 +45,8 @@ minBlueS: 125
 maxBlueV: 255
 minBlueV: 32
 
+map_tf: "/vmap"
+base_tf: "/base_link"
+camera1_tf: "/camera1_link"
+camera2_tf: "/camera2_link"
+

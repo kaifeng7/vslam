@@ -73,36 +73,63 @@ void VSlam::initROS()
     pnh_.param<int>("maxBlueV", mParam.max_blue_v, 0);
     pnh_.param<int>("minBlueV", mParam.min_blue_v, 0);
 
+    pnh_.param<std::string>("base_tf", mTFParam.base_tf, "");
+    pnh_.param<std::string>("camera1_tf", mTFParam.camera1_tf, "");
+    pnh_.param<std::string>("camera2_tf", mTFParam.camera2_tf, "");
+    pnh_.param<std::string>("map_tf", mTFParam.map_tf, "");
 
     mCameraParamLeft.preProcess();
     mCameraParamFront.preProcess();
-    
-
 }
 
 void VSlam::callbackGetOdom(const nav_msgs::OdometryConstPtr &msg)
 {
     bOdom = true;
     m_CurrentPose = msg->pose.pose;
+    time = msg->header.stamp;
 }
 
-void VSlam::callbackGetImage(const sensor_msgs::ImageConstPtr &msg_left,const sensor_msgs::ImageConstPtr &msg_front)
+void VSlam::callbackGetImage(const sensor_msgs::ImageConstPtr &msg_left, const sensor_msgs::ImageConstPtr &msg_front)
 {
     m_CountImageId++;
     bImage = true;
 
     m_CurrentImage = Image();
-    processPicture(m_CurrentImageMat[0],m_CurrentImage,msg_left,1);
-    processPicture(m_CurrentImageMat[1],m_CurrentImage,msg_front,2);
 
+    try
+    {
+        tf_Listener.waitForTransform(mTFParam.base_tf, mTFParam.camera1_tf, ros::Time(0), ros::Duration(0.1));
+        tf_Listener.lookupTransform(mTFParam.base_tf, mTFParam.camera1_tf, ros::Time(0), tf_base_to_camera1);
+        tf_Listener.waitForTransform(mTFParam.base_tf, mTFParam.camera2_tf, ros::Time(0), ros::Duration(0.1));
+        tf_Listener.lookupTransform(mTFParam.base_tf, mTFParam.camera2_tf, ros::Time(0), tf_base_to_camera2);
+    }
+    catch (tf::TransformException &ex)
+    {
+        ROS_ERROR("Transform error in imuCB: %s", ex.what());
+        return;
+    }
+
+    tf::Quaternion q_;
+    tf::Vector3 v_;
+    tf::quaternionMsgToTF(m_CurrentPose.orientation, q_);
+    tf::pointMsgToTF(m_CurrentPose.position, v_);
+
+    tf_map_to_base = tf::Transform(q_, v_);
+
+    //map->camera
+    tf_map_to_camera1 = tf_map_to_base * tf_base_to_camera1;
+    tf_map_to_camera2 = tf_map_to_base * tf_base_to_camera2;
+
+    processPicture(m_CurrentImageMat[0], m_CurrentImage, msg_left, 1);
+    processPicture(m_CurrentImageMat[1], m_CurrentImage, msg_front, 2);
+
+    tf_Broadcaster.sendTransform(tf::StampedTransform(tf_map_to_base, time, mTFParam.map_tf, mTFParam.base_tf));
 
     if (isKeyPoint(m_CurrentImage))
     {
         mp_CurrentKeyFrame = new KeyFrame();
         setKeyFrame(m_CurrentImage, mp_CurrentKeyFrame, mp_RefKeyFrame);
     }
-
-    
 }
 
 void VSlam::processPicture(cv::Mat &mat_cur, Image &image, const sensor_msgs::ImageConstPtr &msg, const int &flag)
@@ -159,8 +186,7 @@ bool VSlam::isKeyPoint(const Image &image)
     for (int i = 0; i < image.image_parts.size(); i++)
     {
         Count += image.image_parts.at(i).cards.size();
-    }   
-    
+    }
 
     if (Count > 1)
         return true;
@@ -308,6 +334,8 @@ void VSlam::setKeyFrame(const Image &img, KeyFrame *kf_cur, KeyFrame *kf_ref)
     kf_cur->refKeyFrame = kf_ref;
 
     mMap.insertKeyFrame(kf_cur);
+    
+    setMapPoint(kf_cur);
 }
 
 void VSlam::setCameraPose(KeyFrame *pKF)
@@ -335,17 +363,15 @@ void VSlam::setCameraPose(KeyFrame *pKF)
 
 void VSlam::setMapPoint(KeyFrame *pKF)
 {
-    for (int i = 0; i < pKF->mImage.image_parts.size(); i++)
+    for (int i = 0; i < pKF->mImage.image_parts.at(0).cards.size(); i++)
     {
-        for (int j = 0; j < pKF->mImage.image_parts.at(i).cards.size(); i++)
-        {
-            Card card = pKF->mImage.image_parts.at(i).cards.at(i);
-            MapPoint *pMP = new MapPoint(card, pKF->mImage.image_parts.at(i).mCamera.camera2world(card.pose), card.card_id);
-            if (mMap.insertMapPoint(pMP, pKF, i) == false) //mapPoint在地图中已有
-                delete pMP;
+        Card card = pKF->mImage.image_parts.at(0).cards.at(i);
+        MapPoint *pMP = new MapPoint(card, pKF->mImage.image_parts.at(0).mCamera.camera2world(card.pose), card.card_id);
+        if (mMap.insertMapPoint(pMP, pKF, i) == false) //mapPoint在地图中已有
+            delete pMP;
 
-            pKF->mpMapPoints.push_back(mMap.mpMapPoints.at(card.card_id));
-        }
+        pKF->mpMapPoints.push_back(mMap.mpMapPoints.at(card.card_id));
+        ROS_INFO_STREAM(card.card_id);
     }
 }
 
@@ -404,13 +430,17 @@ void VSlam::detectDistance(Image &image, const int &flag)
     {
         Eigen::Vector3d v[5];
         CameraParam camera_param;
+        tf::Transform transform;
         switch (flag)
         {
         case 1:
             camera_param = mCameraParamLeft;
+            transform = tf_base_to_camera1;
+            
             break;
         case 2:
             camera_param = mCameraParamFront;
+            transform = tf_base_to_camera2;
             break;
         default:
             break;
@@ -427,9 +457,14 @@ void VSlam::detectDistance(Image &image, const int &flag)
         height = (v[2] - v[0]).y();
         double depth = 0.7 / height * 1;
 
-        image.image_parts.at(flag - 1).cards.at(i).pose(0, 0) = depth;
-        image.image_parts.at(flag - 1).cards.at(i).pose(1, 0) = depth * v[4].x();
-        image.image_parts.at(flag - 1).cards.at(i).pose(2, 0) = depth * v[4].y();
+        tf::Point relative_point(depth,depth * v[4].x() * (-1),0);
+        tf::Point absolute_point = transform * relative_point; 
+
+        image.image_parts.at(flag - 1).cards.at(i).pose(0, 0) = absolute_point.getX();
+        image.image_parts.at(flag - 1).cards.at(i).pose(1, 0) = absolute_point.getY();
+        //image.image_parts.at(flag - 1).cards.at(i).pose(2, 0) = depth * v[4].y();
+        image.image_parts.at(flag - 1).cards.at(i).pose(2, 0) = absolute_point.getZ();
+
         cv::putText(m_CurrentImageMat[flag - 1], std::to_string(image.image_parts.at(flag - 1).cards.at(i).pose(0, 0)), image.image_parts.at(flag - 1).cards.at(i).key_points.at(3), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0));
     }
 }
@@ -548,11 +583,11 @@ void VSlam::MainLoop()
             ROS_WARN_STREAM("wait Image msg...");
             continue;
         }
-        // if (bOdom == false)
-        // {
-        //     ROS_WARN_STREAM("wait Odom msg...");
-        //     continue;
-        // }
+        if (bOdom == false)
+        {
+            ROS_WARN_STREAM("wait Odom msg...");
+            continue;
+        }
 
         // if (bInit && m_CurrentKeyFrame.mKeyFrameId == 0)
         // {

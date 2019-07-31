@@ -24,6 +24,8 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/opencv.hpp>
 #include <tf/tf.h>
+#include <tf/transform_broadcaster.h>
+#include<tf/transform_listener.h>
 #include <vslam/Viz.h>
 
 #include "map.h"
@@ -52,7 +54,13 @@ struct DetectionParam
     int min_blue_h;
     int min_blue_s;
     int min_blue_v;  
-
+};
+struct TFParam
+{    
+    std::string map_tf;
+    std::string base_tf;
+    std::string camera1_tf;
+    std::string camera2_tf;
 };
 
 class VSlam
@@ -75,9 +83,22 @@ class VSlam
         ros::Publisher pub_CardRviz;
         ros::Publisher pub_slam;
 
+        tf::TransformBroadcaster tf_Broadcaster;
+        tf::TransformListener tf_Listener;
+        tf::StampedTransform tf_base_to_camera1;
+        tf::StampedTransform tf_base_to_camera2;
+        tf::Transform tf_map_to_base;
+
+        tf::Transform tf_map_to_camera1;
+        tf::Transform tf_map_to_camera2;
+        
+        ros::Time time;
+
+
         bool bImage;
         bool bOdom;
         bool bInit;//初始化
+        bool bTF;
 
         cv::Mat m_CurrentImageMat[2];
         cv::Mat m_ImageRawMat[2];
@@ -93,7 +114,7 @@ class VSlam
         DetectionParam mParam;//参数
         CameraParam mCameraParamLeft;//相机参数
         CameraParam mCameraParamFront;//相机参数
-
+        TFParam mTFParam;
 
         Map mMap;
 
