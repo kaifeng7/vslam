@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-25 10:45:13 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-07-19 16:57:25
+ * @Last Modified time: 2019-07-31 22:15:30
  */
 #include "map.h"
 
@@ -13,6 +13,7 @@ Map::Map()
 
     std::vector<MapPoint *> mp(128, nullptr);
     mpMapPoints = mp;
+    
 }
 
 Map::~Map()
