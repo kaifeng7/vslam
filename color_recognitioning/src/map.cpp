@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-25 10:45:13 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-07-31 22:15:30
+ * @Last Modified time: 2019-08-01 16:27:15
  */
 #include "map.h"
 
@@ -30,6 +30,8 @@ bool Map::insertMapPoint(MapPoint *pMP, KeyFrame *pKF, const int &n)
     if (mpMapPoints.at(pMP->mMapPointId) == nullptr)
     {
         mpMapPoints.at(pMP->mMapPointId) = pMP;
+        mpMapPoints.at(pMP->mMapPointId)->setRefKeyFrame(pKF, n);
+
         return true;
     }
     else

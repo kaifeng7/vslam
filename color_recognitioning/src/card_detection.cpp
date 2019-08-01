@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:30 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-08-01 15:34:40
+ * @Last Modified time: 2019-08-01 17:24:14
  */
 
 #include "card_detection.h"
@@ -27,7 +27,8 @@ void VSlam::initROS()
     pub_CameraRviz = nh_.advertise<visualization_msgs::Marker>("/camera_rviz", 10);
     pub_PointRviz = nh_.advertise<visualization_msgs::Marker>("/point_rviz", 10);
     pub_LoopCameraRviz = nh_.advertise<visualization_msgs::MarkerArray>("/loop_camera_rviz", 10);
-    pub_LoopCardRviz = nh_.advertise<visualization_msgs::MarkerArray>("/loop_card_rviz",10);
+    pub_LoopCardRviz = nh_.advertise<visualization_msgs::MarkerArray>("/loop_card_rviz", 10);
+    pub_LoopIdRviz = nh_.advertise<visualization_msgs::MarkerArray>("/loop_id_rviz",10);
 
     pub_slam = nh_.advertise<vslam::Viz>("/slam_viz", 10);
 
@@ -148,14 +149,9 @@ void VSlam::callbackGetImage(const sensor_msgs::ImageConstPtr &msg_left, const s
         setKeyFrame(m_CurrentImage, &mp_CurrentKeyFrame, &mp_RefKeyFrame);
         //ROS_INFO_STREAM(mp_CurrentKeyFrame->mImage.pose(0,3)<<" "<<mp_CurrentKeyFrame->mImage.pose(1,3));
         visualization_msgs::Marker camera_pos;
-        VisCameraWorld(camera_pos, mp_CurrentKeyFrame);
-        pub_CameraRviz.publish(camera_pos);
-      ROS_INFO_STREAM(se3.angleX()<<" "<<
-                se3.angleY()<<" "<<
-                se3.angleZ()) ;
+        if (VisCameraWorld(camera_pos, mp_CurrentKeyFrame))
+            pub_CameraRviz.publish(camera_pos);
     }
-
-    
 }
 
 void VSlam::processPicture(cv::Mat &mat_cur, Image &image, const sensor_msgs::ImageConstPtr &msg, const int &flag)
@@ -428,45 +424,43 @@ void VSlam::setMapPoint(KeyFrame *pKF, MapPoint **ppMP)
             visualization_msgs::Marker card_pos;
             visualization_msgs::Marker card_id;
 
-            VisCardInWorld(card_pos, *ppMP);
-            VisIdInWorld(card_id, *ppMP);
-
-            pub_CardRviz.publish(card_pos);
-            pub_IdRviz.publish(card_id);
+            if (VisCardInWorld(card_pos, *ppMP))
+                pub_CardRviz.publish(card_pos);
+            if (VisIdInWorld(card_id, *ppMP))
+                pub_IdRviz.publish(card_id);
         }
     }
 
-    for (int i = 0; i < pKF->mImage.image_parts.at(0).cards.size(); i++) //前
-    {
-        Card card = pKF->mImage.image_parts.at(0).cards.at(i);
-        if (isMapPoint(card))
-        {
-            *ppMP = new MapPoint(card, pKF->mImage.image_parts.at(0).mCamera.camera2world(card.pose), card.card_id);
-            if (mMap.insertMapPoint(*ppMP, pKF, pKF->mKeyFrameId) == false) //mapPoint在地图中已有
-            {
-                delete *ppMP;
-                *ppMP = nullptr;
-            }
+    // for (int i = 0; i < pKF->mImage.image_parts.at(0).cards.size(); i++) //左
+    // {
+    //     Card card = pKF->mImage.image_parts.at(0).cards.at(i);
+    //     if (isMapPoint(card))
+    //     {
+    //         *ppMP = new MapPoint(card, pKF->mImage.image_parts.at(0).mCamera.camera2world(card.pose), card.card_id);
+    //         if (mMap.insertMapPoint(*ppMP, pKF, pKF->mKeyFrameId) == false) //mapPoint在地图中已有
+    //         {
+    //             delete *ppMP;
+    //             *ppMP = nullptr;
+    //         }
 
-            pKF->mpMapPoints.push_back(mMap.mpMapPoints.at(card.card_id));
+    //         pKF->mpMapPoints.push_back(mMap.mpMapPoints.at(card.card_id));
 
-            visualization_msgs::Marker card_pos;
-            visualization_msgs::Marker card_id;
+    //         visualization_msgs::Marker card_pos;
+    //         visualization_msgs::Marker card_id;
 
-            VisCardInWorld(card_pos, *ppMP);
-            VisIdInWorld(card_id, *ppMP);
-
-            pub_CardRviz.publish(card_pos);
-            pub_IdRviz.publish(card_id);
-        }
-    }
+    //         if (VisCardInWorld(card_pos, *ppMP))
+    //             pub_CardRviz.publish(card_pos);
+    //         if (VisIdInWorld(card_id, *ppMP))
+    //             pub_IdRviz.publish(card_id);
+    //     }
+    // }
 }
 
-void VSlam::VisCardInWorld(visualization_msgs::Marker &marker, const MapPoint *mp)
+bool VSlam::VisCardInWorld(visualization_msgs::Marker &marker, const MapPoint *mp)
 {
     if (mp == nullptr)
     {
-        return;
+        return false;
     }
     geometry_msgs::Pose pose;
 
@@ -492,13 +486,14 @@ void VSlam::VisCardInWorld(visualization_msgs::Marker &marker, const MapPoint *m
     marker.color.r = 0;
     marker.lifetime = ros::Duration();
     marker.frame_locked = false;
+    return true;
 }
 
-void VSlam::VisIdInWorld(visualization_msgs::Marker &marker, const MapPoint *mp)
+bool VSlam::VisIdInWorld(visualization_msgs::Marker &marker, const MapPoint *mp)
 {
     if (mp == nullptr)
     {
-        return;
+        return false;
     }
     geometry_msgs::Pose pose;
     pose.position.x = mp->mWorldPositionPoint.x();
@@ -520,18 +515,19 @@ void VSlam::VisIdInWorld(visualization_msgs::Marker &marker, const MapPoint *mp)
     marker.pose = pose;
 
     marker.scale.x = 0.0;
-    marker.scale.y = 5.0;
+    marker.scale.y = 3.0;
     marker.scale.z = 1.0;
 
     marker.frame_locked = false;
     marker.lifetime = ros::Duration();
+    return true;
 }
 
-void VSlam::VisCameraWorld(visualization_msgs::Marker &marker, const KeyFrame *kf)
+bool VSlam::VisCameraWorld(visualization_msgs::Marker &marker, const KeyFrame *kf)
 {
     if (kf == nullptr)
     {
-        return;
+        return false;
     }
     geometry_msgs::Pose pose;
     pose.position.x = kf->mImage.pose(0, 3);
@@ -558,13 +554,14 @@ void VSlam::VisCameraWorld(visualization_msgs::Marker &marker, const KeyFrame *k
 
     marker.frame_locked = false;
     marker.lifetime = ros::Duration();
+    return true;
 }
 
-void VSlam::VisPointWorld(visualization_msgs::Marker &marker, const KeyFrame *kf)
+bool VSlam::VisPointWorld(visualization_msgs::Marker &marker, const KeyFrame *kf)
 {
     if (kf == nullptr)
     {
-        return;
+        return false;
     }
     geometry_msgs::Pose pose;
     pose.position.x = kf->mImage.pose(0, 3);
@@ -592,6 +589,7 @@ void VSlam::VisPointWorld(visualization_msgs::Marker &marker, const KeyFrame *kf
 
     marker.frame_locked = false;
     marker.lifetime = ros::Duration();
+    return true;
 }
 
 void VSlam::VisLoopCameraWorld(visualization_msgs::MarkerArray &markers, const std::vector<geometry_msgs::Pose> &poses)
@@ -647,6 +645,40 @@ void VSlam::VisLoopCardWorld(visualization_msgs::MarkerArray &markers, const std
         marker.scale.z = 0.5;
         marker.frame_locked = false;
         marker.lifetime = ros::Duration();
+
+        markers.markers.push_back(marker);
+    }
+}
+
+void VSlam::VisLoopIdWorld(visualization_msgs::MarkerArray &markers, const std::vector<geometry_msgs::Pose> &poses, const std::vector<std::string> &strs)
+{
+    for (int i = 0; i < poses.size(); i++)
+    {
+        visualization_msgs::Marker marker;
+        marker.pose = poses.at(i);
+
+        marker.color.a = 1.0;
+        marker.color.b = 1.0;
+        marker.color.r = 1.0;
+
+        marker.header.stamp = ros::Time();
+        marker.header.frame_id = "/odom";
+        marker.ns = "Loop_Id_position";
+        marker.id = i;
+
+        marker.scale.x = 0.5;
+        marker.scale.y = 0.5;
+        marker.scale.z = 0.5;
+        marker.frame_locked = false;
+        marker.lifetime = ros::Duration();
+
+        marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.text = strs.at(i);
+
+        marker.scale.x = 0.0;
+        marker.scale.y = 3.0;
+        marker.scale.z = 1.0;
 
         markers.markers.push_back(marker);
     }
@@ -821,33 +853,30 @@ void VSlam::MainLoop()
         if (mMap.mpKeyFrames.at(1200) != nullptr)
         {
             visualization_msgs::Marker point_pose;
-            VisPointWorld(point_pose, mMap.mpKeyFrames.at(1200));
-            pub_PointRviz.publish(point_pose);
+            if (VisPointWorld(point_pose, mMap.mpKeyFrames.at(1200)))
+                pub_PointRviz.publish(point_pose);
         }
         if (mMap.mpKeyFrames.at(150) != nullptr)
         {
             visualization_msgs::Marker point_pose;
-            VisPointWorld(point_pose, mMap.mpKeyFrames.at(150));
-            pub_PointRviz.publish(point_pose);
+            if (VisPointWorld(point_pose, mMap.mpKeyFrames.at(150)))
+                pub_PointRviz.publish(point_pose);
         }
         if (m_CountKeyFrameId > 1200)
         {
             geometry_msgs::Pose first, last;
             first.position.x = mMap.mpKeyFrames.at(150)->mImage.pose(0, 3);
             first.position.y = mMap.mpKeyFrames.at(150)->mImage.pose(1, 3);
-            first.position.z = mMap.mpKeyFrames.at(150)->mImage.image_parts.at(0).mCamera.mTwc.angleZ();//angle
-
+            first.position.z = mMap.mpKeyFrames.at(150)->mImage.image_parts.at(0).mCamera.mTwc.angleZ(); //angle
 
             last.position.x = mMap.mpKeyFrames.at(1200)->mImage.pose(0, 3);
             last.position.y = mMap.mpKeyFrames.at(1200)->mImage.pose(1, 3);
-            last.position.z = mMap.mpKeyFrames.at(1200)->mImage.image_parts.at(0).mCamera.mTwc.angleZ();//angle
-
+            last.position.z = mMap.mpKeyFrames.at(1200)->mImage.image_parts.at(0).mCamera.mTwc.angleZ(); //angle
 
             geometry_msgs::Pose diff;
             diff.position.x = last.position.x - first.position.x;
             diff.position.y = last.position.y - first.position.y;
             diff.position.z = last.position.z - first.position.z;
-
 
             double delta_x = diff.position.x / 1050;
             double delta_y = diff.position.y / 1050;
@@ -858,23 +887,26 @@ void VSlam::MainLoop()
             {
                 geometry_msgs::Pose pose;
 
-                mMap.mpKeyFrames.at(i)->mImage.pose(0,3) -=delta_x *(i-150);
-                mMap.mpKeyFrames.at(i)->mImage.pose(1,3) -=delta_y *(i-150); 
+                mMap.mpKeyFrames.at(i)->mImage.pose(0, 3) -= delta_x * (i - 150);
+                mMap.mpKeyFrames.at(i)->mImage.pose(1, 3) -= delta_y * (i - 150);
 
                 double angle = mMap.mpKeyFrames.at(i)->mImage.image_parts.at(0).mCamera.mTwc.angleZ();
-                angle -= delta_z*(i-150);
+                angle -= delta_z * (i - 150);
 
-                pose.position.x = mMap.mpKeyFrames.at(i)->mImage.pose(0, 3) ;
-                pose.position.y = mMap.mpKeyFrames.at(i)->mImage.pose(1, 3) ;
+                pose.position.x = mMap.mpKeyFrames.at(i)->mImage.pose(0, 3);
+                pose.position.y = mMap.mpKeyFrames.at(i)->mImage.pose(1, 3);
                 pose.position.z = 0;
 
-                for(int j = 0;j<mMap.mpKeyFrames.at(i)->mImage.image_parts.size();j++)
+                for (int j = 0; j < mMap.mpKeyFrames.at(i)->mImage.image_parts.size(); j++)
                 {
-                    mMap.mpKeyFrames.at(i)->mImage.image_parts.at(j).mCamera.mTwc.normalize();
-                    mMap.mpKeyFrames.at(i)->mImage.image_parts.at(j).mCamera.mTwc.trans(pose.position.x,pose.position.y,pose.position.z);
-                    mMap.mpKeyFrames.at(i)->mImage.image_parts.at(j).mCamera.mTwc.rotZ(angle);
-                }
+                    tf::Quaternion tf_q;
+                    tf_q.setRPY(0, 0, angle);
+                    Eigen::Quaterniond quat(tf_q.w(), tf_q.x(), tf_q.y(), tf_q.z());
+                    Eigen::Vector3d t(pose.position.x, pose.position.y, pose.position.z);
 
+                    Sophus::SE3d se3(quat, t);
+                    mMap.mpKeyFrames.at(i)->mImage.image_parts.at(j).mCamera.mTwc = se3;
+                }
 
                 poses.push_back(pose);
             }
@@ -882,26 +914,34 @@ void VSlam::MainLoop()
             visualization_msgs::MarkerArray markers;
             VisLoopCameraWorld(markers, poses);
             pub_LoopCameraRviz.publish(markers);
-            
-            poses.clear();
-            for(int i = 0;i<128;i++)
+
+            std::vector<geometry_msgs::Pose> poses2;
+            std::vector<std::string> strs;
+            for (int i = 0; i < 128; i++)
             {
-                if(mMap.mpMapPoints.at(i)!=nullptr)
+                if (mMap.mpMapPoints.at(i) != nullptr)
                 {
+                    ROS_INFO_STREAM(mMap.mpMapPoints.at(i)->mpKeyFrames.size());
                     KeyFrame *pKF = mMap.mpMapPoints.at(i)->mpKeyFrames.at(0).first;
-                    Eigen::Vector3d vec = pKF->mImage.image_parts.at(i).mCamera.camera2world(mMap.mpMapPoints.at(i)->mCard.pose);
+                    Eigen::Vector3d vec = pKF->mImage.image_parts.at(0).mCamera.camera2world(mMap.mpMapPoints.at(i)->mCard.pose);
                     geometry_msgs::Pose pose;
-                    pose.position.x = vec(0,0);
-                    pose.position.y = vec(1,0);
+                    std::string str;
+                    pose.position.x = vec(0, 0);
+                    pose.position.y = vec(1, 0);
                     pose.position.z = 0;
-                    poses.push_back(pose); 
+                    str = mMap.mpMapPoints.at(i)->mCard.code_id;
+                    poses2.push_back(pose);
+                    strs.push_back(str);
                 }
             }
-            markers.markers.clear();
-            VisLoopCardWorld(markers,poses);
-            pub_LoopCardRviz.publish(markers);
+            visualization_msgs::MarkerArray markers2;
+            VisLoopCardWorld(markers2, poses2);
+            pub_LoopCardRviz.publish(markers2);
 
-            
+            visualization_msgs::MarkerArray markers3;
+            VisLoopIdWorld(markers3, poses2,strs);
+            pub_LoopIdRviz.publish(markers3);
+
         }
         // publishVslam(viz);
         // pub_MarkerRviz.publish(markers);

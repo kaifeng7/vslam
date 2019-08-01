@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:32 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-08-01 15:24:25
+ * @Last Modified time: 2019-08-01 17:23:25
  */
 
 #ifndef CARD_DETECTION_H
@@ -85,6 +85,8 @@ class VSlam
         ros::Publisher pub_PointRviz;
         ros::Publisher pub_LoopCameraRviz;
         ros::Publisher pub_LoopCardRviz;
+        ros::Publisher pub_LoopIdRviz;
+
 
         ros::Publisher pub_slam;
 
@@ -146,13 +148,15 @@ class VSlam
         void setMapPoint(KeyFrame *pKF,MapPoint **ppMp);
         void initROS();     
         
-        void VisCardInWorld(visualization_msgs::Marker &marker,const MapPoint *mp);
-        void VisIdInWorld(visualization_msgs::Marker &marker,const MapPoint *mp);
-        void VisCameraWorld(visualization_msgs::Marker &marker,const KeyFrame *kf);
-        void VisPointWorld(visualization_msgs::Marker &marker,const KeyFrame *kf);
+        bool VisCardInWorld(visualization_msgs::Marker &marker,const MapPoint *mp);
+        bool VisIdInWorld(visualization_msgs::Marker &marker,const MapPoint *mp);
+        bool VisCameraWorld(visualization_msgs::Marker &marker,const KeyFrame *kf);
+        bool VisPointWorld(visualization_msgs::Marker &marker,const KeyFrame *kf);
 
         void VisLoopCameraWorld(visualization_msgs::MarkerArray &markers,const std::vector<geometry_msgs::Pose> &poses);
         void VisLoopCardWorld(visualization_msgs::MarkerArray &markers,const std::vector<geometry_msgs::Pose> &poses);
+        void VisLoopIdWorld(visualization_msgs::MarkerArray &markers, const std::vector<geometry_msgs::Pose> &poses,const std::vector<std::string> &str);
+
 
         void publishVslam(vslam::Viz &viz);
         
