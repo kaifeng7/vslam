@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:32 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-07-31 22:36:50
+ * @Last Modified time: 2019-08-01 15:24:25
  */
 
 #ifndef CARD_DETECTION_H
@@ -81,6 +81,11 @@ class VSlam
         ros::Publisher pub_CardRviz;
         ros::Publisher pub_IdRviz;
         ros::Publisher pub_DetectedImageRviz;
+        ros::Publisher pub_CameraRviz;
+        ros::Publisher pub_PointRviz;
+        ros::Publisher pub_LoopCameraRviz;
+        ros::Publisher pub_LoopCardRviz;
+
         ros::Publisher pub_slam;
 
         tf::TransformBroadcaster tf_Broadcaster;
@@ -136,13 +141,18 @@ class VSlam
 
         bool isKeyFrame(const Image &image);
         bool isMapPoint(const Card &card);
-        void setKeyFrame(const Image &img,KeyFrame *kf_cur,KeyFrame *kf_ref);
+        void setKeyFrame(const Image &img,KeyFrame **pp_kf_cur,KeyFrame **pp_kf_ref);
         void setCameraPose(KeyFrame *mKF);
-        void setMapPoint(KeyFrame *pKF,MapPoint *pMp);
+        void setMapPoint(KeyFrame *pKF,MapPoint **ppMp);
         void initROS();     
         
         void VisCardInWorld(visualization_msgs::Marker &marker,const MapPoint *mp);
         void VisIdInWorld(visualization_msgs::Marker &marker,const MapPoint *mp);
+        void VisCameraWorld(visualization_msgs::Marker &marker,const KeyFrame *kf);
+        void VisPointWorld(visualization_msgs::Marker &marker,const KeyFrame *kf);
+
+        void VisLoopCameraWorld(visualization_msgs::MarkerArray &markers,const std::vector<geometry_msgs::Pose> &poses);
+        void VisLoopCardWorld(visualization_msgs::MarkerArray &markers,const std::vector<geometry_msgs::Pose> &poses);
 
         void publishVslam(vslam::Viz &viz);
         
