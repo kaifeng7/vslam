@@ -35,8 +35,8 @@ find_package(G2O REQUIRED)
 
 add_message_files(
     DIRECTORY msg
-    FILES Camera.msg
-          Card.msg
+    FILES KeyFrame.msg
+          MapPoint.msg
           Viz.msg
 )
 generate_messages(

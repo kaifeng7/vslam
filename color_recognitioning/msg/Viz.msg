@@ -1,3 +1,3 @@
 Header header
-Camera camera
-Card[] cards
+KeyFrame key_frame
+MapPoint[] map_points

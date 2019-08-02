@@ -2,7 +2,7 @@
  * @Author: fengkai 
  * @Date: 2019-06-21 16:10:32 
  * @Last Modified by: fengkai
- * @Last Modified time: 2019-08-01 17:23:25
+ * @Last Modified time: 2019-08-01 22:54:54
  */
 
 #ifndef CARD_DETECTION_H
@@ -106,6 +106,7 @@ class VSlam
         bool bOdom;
         bool bInit;//初始化
         bool bTF;
+        bool bLoop;
 
         std::vector<int> mCountCards;
 
@@ -115,6 +116,14 @@ class VSlam
         Image m_CurrentImage;
         Image m_LastImage;
         geometry_msgs::Pose m_CurrentPose;
+        geometry_msgs::Pose m_PrePose;
+        geometry_msgs::Pose m_DiffPose;
+        geometry_msgs::Pose m_RealPose;
+
+        double m_CurrentAngle;
+        double m_PreAngle;
+        double m_DiffAngle;
+        double m_RealAngle;
 
         KeyFrame *mp_CurrentKeyFrame;
         KeyFrame *mp_RefKeyFrame;
@@ -158,7 +167,7 @@ class VSlam
         void VisLoopIdWorld(visualization_msgs::MarkerArray &markers, const std::vector<geometry_msgs::Pose> &poses,const std::vector<std::string> &str);
 
 
-        void publishVslam(vslam::Viz &viz);
+        void publishVslam(vslam::Viz &viz,KeyFrame *kf);
         
         void MainLoop();
 

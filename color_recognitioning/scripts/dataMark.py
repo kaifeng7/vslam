@@ -4,6 +4,7 @@ import cv2 as cv
 import numpy as np
 import rospy
 from vslam.msg import Viz
+from nav_msgs.msg import OccupancyGrid
 
 from common import send, SERVER
   
@@ -18,20 +19,56 @@ dataInfo = {
   'timestamp': 1
 }
 
-def onData(msg):
+def onGMapData(msg):
+  jsonData = {
+    'gmap': {
+      'info': {
+        'resolution': msg.info.resolution,
+        'width': msg.info.width,
+        'height': msg.info.height,
+        'location': {
+          'x': msg.info.origin.position.x,
+          'y': msg.info.origin.position.y,
+          'z': msg.info.origin.position.z
+        }
+      },
+      'data': msg.data
+    }
+  }
+  send(s, dataInfo, json.dumps(jsonData), 'string')
+
+  dataInfo['sequence'] += 1
+  dataInfo['timestamp'] += 1
+
+def onVSlamData(msg):
   # get json data
   jsonData = {
-    'observers': [],
+    'observers': {},
     'marks': []
   }
-  jsonData['observers'].append({
+  jsonData['observer'] = {
+    'id': msg.key_frame.key_frame_id,
     'location': {
-      'x': msg.camera.camera_pose.position.x, 
-      'y': msg.camera.camera_pose.position.y, 
-      'z': msg.camera.camera_pose.position.z
+      'x': msg.key_frame.camera_pose.position.x, 
+      'y': msg.key_frame.camera_pose.position.y, 
+      'z': msg.key_frame.camera_pose.position.z
     }
-  })
-  for data in msg.cards:
+  }
+  # for data in msg.key_frame:
+  #   jsonData['observers'].append({
+  #     'location': {
+  #       'x': data.camera_pose.position.x, 
+  #       'y': data.camera_pose.position.y, 
+  #       'z': data.camera_pose.position.z
+  #     }, 
+  #     'orientation': {
+  #       'x': data.camera_pose.orientation.x,
+  #       'y': data.camera_pose.orientation.y,
+  #       'z': data.camera_pose.orientation.z,
+  #       'w': data.camera_pose.orientation.w
+  #     }
+  #   })
+  for data in msg.map_points:
     jsonData['marks'].append({
       'id': data.card_id,
       'code': data.code_id,
@@ -49,7 +86,9 @@ def onData(msg):
 if __name__ == "__main__":
 
   rospy.init_node('vizMarkSender', anonymous=True)
-  rospy.Subscriber('slam_viz', Viz, onData)
+  rospy.Subscriber('slam_viz', Viz, onVSlamData)
+  rospy.Subscriber('map', OccupancyGrid, onGMapData)
+
   rospy.spin()
 
   s.close()

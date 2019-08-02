@@ -16,40 +16,58 @@ dataInfo = {
 }
 
 if __name__ == "__main__":
-
+  
 	msg = {
-		'observer': [
-			{
-				'location': { 'x': 1, 'y': 2, 'z': 1}
-			}
-		],
-		'marks': [
-			{
-				'id': 'mark1',
-				'location': {'x': 0, 'y': 2, 'z': 1},
-				'code': '0101001'
-			}
-		]
+		'gmap': {
+			'info': {
+				'resolution': 1,
+				'width': 4,
+				'height': 4,
+				'location': { 'x': 0, 'y': 0, 'z': 0 }
+			},
+			'data': [0, 10, 100, 5, 0, 10, 100, 5, 0, 10, 100, 5, 0, 10, 100, 5]
+		}
 	}
 	send(s, dataInfo, json.dumps(msg), 'string')
 
-	time.sleep(30 / 1000)
-	dataInfo['sequence'] += 1
-	dataInfo['timestamp'] += 1
+	# msg = {
+	# 	'observers': [
+	# 		{
+	# 			'location': { 'x': 1, 'y': 2, 'z': 1}
+	# 		}
+	# 	],
+	# 	'marks': [
+	# 		{
+	# 			'id': 'mark1',
+	# 			'location': {'x': 0, 'y': 2, 'z': 1},
+	# 			'code': '0101001'
+	# 		}, 
+	# 		{
+	# 			'id': 'mark2',
+	# 			'location': {'x': 1, 'y': 4, 'z': 1},
+	# 			'code': '0101001'
+	# 		}
+	# 	]
+	# }
+	# send(s, dataInfo, json.dumps(msg), 'string')
 
-	msg = {
-		'observer': [{
-			'location': { 'x': 2, 'y': 2.5, 'z': 1}
-		}],
-		'marks': [
-			{
-				'id': 'mark1',
-				'location': {'x': 0, 'y': 2, 'z': 1},
-				'code': '0101001'
-			}
-		]
-	}
+	# time.sleep(30 / 1000)
+	# dataInfo['sequence'] += 1
+	# dataInfo['timestamp'] += 1
 
-	send(s, dataInfo, json.dumps(msg), 'string')
+	# msg = {
+	# 	'observers': [
+	# 		{'location': { 'x': 2, 'y': 2.5, 'z': 1}},
+	# 		{'location': { 'x': 3, 'y': 3, 'z': 1}}
+	# 	],
+	# 	'marks': [
+	# 		{
+	# 			'id': 'mark1',
+	# 			'location': {'x': 0, 'y': 2, 'z': 1},
+	# 			'code': '0101001'
+	# 		}
+	# 	]
+	# }
+	# send(s, dataInfo, json.dumps(msg), 'string')
 
 	s.close()
