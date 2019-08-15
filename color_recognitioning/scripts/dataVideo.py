@@ -23,6 +23,7 @@ dataInfo = {
 
 def onData(imgMsg):
   img = bridge.imgmsg_to_cv2(imgMsg, 'bgr8')
+  img = cv.resize(img, (640, 480))
   jpgImg = cv.imencode('.jpg', img)[1]
   data = np.array(jpgImg)
   

@@ -61,6 +61,7 @@ void CameraParam::Undistort()
     //return the optimal new camera matrix
     mNewK = cv::getOptimalNewCameraMatrix(mK, mD, imageSize, 0);
 
+
     cv::initUndistortRectifyMap(mK, mD, cv::Mat(),
                                 mNewK, imageSize, CV_16SC2, map1, map2);
 }

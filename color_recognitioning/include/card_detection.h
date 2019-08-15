@@ -15,14 +15,19 @@
 #include <message_filters/sync_policies/approximate_time.h>
 
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <sensor_msgs/Image.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/Odometry.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
+
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/opencv.hpp>
+
+#include <Eigen/Core>
+#include <Eigen/Dense>
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
 #include<tf/transform_listener.h>
@@ -48,6 +53,13 @@ struct DetectionParam
     int min_red_s;
     int min_red_v;  
 
+    int max_red_h2;
+    int max_red_s2;
+    int max_red_v2;
+    int min_red_h2;
+    int min_red_s2;
+    int min_red_v2; 
+
     int max_blue_h;
     int max_blue_s;
     int max_blue_v;
@@ -61,6 +73,18 @@ struct TFParam
     std::string base_tf;
     std::string camera1_tf;
     std::string camera2_tf;
+};
+
+struct Kalman
+{
+    double K_imu;
+    double K_wheel;
+    double K_r;
+    double K_thita;
+
+    Eigen::MatrixXd mu_;//均值
+    Eigen::MatrixXd sigma_;//方差
+
 };
 
 class VSlam
@@ -84,8 +108,11 @@ class VSlam
         ros::Publisher pub_CameraRviz;
         ros::Publisher pub_PointRviz;
         ros::Publisher pub_LoopCameraRviz;
-        ros::Publisher pub_LoopCardRviz;
-        ros::Publisher pub_LoopIdRviz;
+        ros::Publisher pub_CardPositionRviz;
+        ros::Publisher pub_IdPositionRviz;
+
+        ros::Publisher pub_PoseEKFRviz;
+        ros::Publisher pub_CardEKFRviz;
 
 
         ros::Publisher pub_slam;
@@ -100,6 +127,8 @@ class VSlam
         tf::Transform tf_map_to_camera2;
         
         ros::Time time;
+
+        Kalman mKalman;  
 
 
         bool bImage;
@@ -118,18 +147,17 @@ class VSlam
         geometry_msgs::Pose m_CurrentPose;
         geometry_msgs::Pose m_PrePose;
         geometry_msgs::Pose m_DiffPose;
-        geometry_msgs::Pose m_RealPose;
 
         double m_CurrentAngle;
         double m_PreAngle;
         double m_DiffAngle;
-        double m_RealAngle;
 
         KeyFrame *mp_CurrentKeyFrame;
         KeyFrame *mp_RefKeyFrame;
         
         int m_CountImageId;
         int m_CountKeyFrameId;
+        int m_CountMapPointId;
         DetectionParam mParam;//参数
         CameraParam mCameraParamLeft;//相机参数
         CameraParam mCameraParamFront;//相机参数
@@ -137,14 +165,17 @@ class VSlam
 
         Map mMap;
 
-        void callbackGetImage(const sensor_msgs::ImageConstPtr &msg_left,const sensor_msgs::ImageConstPtr &msg_front);
+        //void callbackGetImage(const sensor_msgs::ImageConstPtr &msg_left,const sensor_msgs::ImageConstPtr &msg_front);
+        void callbackGetImage(const sensor_msgs::ImageConstPtr &msg_front);
     
         void callbackGetOdom(const nav_msgs::OdometryConstPtr &msg);
         void triangulation(const Image& image1,const Image& image2,std::vector<MapPoint> &map_points);
 
         void Undistort(const cv::Mat &input,cv::Mat &output);
 
-        double distance2(const double &x,const double &y);       
+        double distance2(const double &x1, const double &y1,const double &x2,const double &y2);
+        void normAngle(double &angle);
+
         void detectDistance(Image &image,const int &flag);
         void cardDetection(cv::Mat &mat, Image &image,const int &flag);
 
@@ -162,13 +193,18 @@ class VSlam
         bool VisCameraWorld(visualization_msgs::Marker &marker,const KeyFrame *kf);
         bool VisPointWorld(visualization_msgs::Marker &marker,const KeyFrame *kf);
 
+        geometry_msgs::PoseWithCovarianceStamped VisPosEKF();
+        visualization_msgs::MarkerArray VisCardEKF();
+
+
+
         void VisLoopCameraWorld(visualization_msgs::MarkerArray &markers,const std::vector<geometry_msgs::Pose> &poses);
-        void VisLoopCardWorld(visualization_msgs::MarkerArray &markers,const std::vector<geometry_msgs::Pose> &poses);
-        void VisLoopIdWorld(visualization_msgs::MarkerArray &markers, const std::vector<geometry_msgs::Pose> &poses,const std::vector<std::string> &str);
+        visualization_msgs::MarkerArray VisCardPosition();
+        visualization_msgs::MarkerArray VisIdPosition();
 
 
-        void publishVslam(vslam::Viz &viz,KeyFrame *kf);
-        
+        vslam::Viz publishVslam();
+
         void MainLoop();
 
 };

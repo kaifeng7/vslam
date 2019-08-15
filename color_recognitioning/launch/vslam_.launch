@@ -4,4 +4,19 @@
     
     </node>
 
+    <node pkg="odom_imu" type="odom_imu_node" name="odom_imu_node" output="screen">
+        <param name="max_interval" type="double" value="2.0" />
+        <param name="angle_vel_sensitive" type="double" value="0.01" />
+        <param name="linear_vel_sensitive" type="double" value="0.01" />
+        <param name="base_frame" type="string" value="/base_link" />
+        <param name="odom_frame" type="string" value="/odom" />
+    </node>
+
+    <node pkg="tf" type="static_transform_publisher" name="base2imu" args="-0.1 0.1 0.05 0 0 0 1 base_link imu_link 10" />
+    <node pkg="tf" type="static_transform_publisher" name="base2rr" args="-0.178 -0.178 -0.165 0 0 0 1 base_link wheel_rr 100" />
+
+    <node pkg="tf" type="static_transform_publisher" name="base2camera1" args="0.2 0 0.3 0 0 0.706825 0.707388 base_link camera1_link 100" />
+    <node pkg="tf" type="static_transform_publisher" name="base2camera2" args="0.2 0 0.3 0 0 0 1 base_link camera2_link 100" />
+
+
 </launch>

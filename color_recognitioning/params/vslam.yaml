@@ -2,41 +2,63 @@ maxRectArea: 20000
 minRectArea: 80
 
 #left camera
-left_fx: 922.29
-left_fy: 922.75
-left_cx: 614.19
-left_cy: 384.97
+front_fx: 922.29
+front_fy: 922.75
+front_cx: 614.19
+front_cy: 384.97
 
-left_k1: -0.3774 
-left_k2: 0.1367
-left_k3: 0
-left_p1: 0
-left_p2: 0
-
-left_width: 720
-left_height: 1280
-
-#front camera
-front_fx: 914.29
-front_fy: 912.78
-front_cx: 596.25
-front_cy: 312.95
-
-front_k1: -0.3916 
-front_k2: 0.1466
+front_k1: -0.3774 
+front_k2: 0.1367
 front_k3: 0
 front_p1: 0
 front_p2: 0
 
 front_width: 720
-front_height: 1280
+lfront_height: 1280
 
+#front camera
+# front_fx: 914.29
+# front_fy: 912.78
+# front_cx: 596.25
+# front_cy: 312.95
+
+# front_k1: -0.3916 
+# front_k2: 0.1466
+# front_k3: 0
+# front_p1: 0
+# front_p2: 0
+
+# front_width: 720
+# front_height: 1280
+
+# front_fx: 775.08
+# front_fy: 781.75
+# front_cx: 637.53
+# front_cy: 348.80
+
+# front_k1: -0.3655 
+# front_k2: 0.0981
+# front_k3: 0
+# front_p1: 0
+# front_p2: 0
+
+# front_width: 720
+# front_height: 1280
+
+#old
 maxRedH: 180
 minRedH: 156
 maxRedS: 255
 minRedS: 90
 maxRedV: 255
 minRedV: 90
+
+maxRedH2: 10
+minRedH2: 0
+maxRedS2: 255
+minRedS2: 90
+maxRedV2: 255
+minRedV2: 90
 
 maxBlueH: 140
 minBlueH: 100
@@ -45,8 +67,35 @@ minBlueS: 125
 maxBlueV: 255
 minBlueV: 32
 
+#new
+# maxRedH: 180
+# minRedH: 156
+# maxRedS: 255
+# minRedS: 35
+# maxRedV: 255
+# minRedV: 32
+
+# maxRedH2: 10
+# minRedH2: 0
+# maxRedS2: 255
+# minRedS2: 35
+# maxRedV2: 255
+# minRedV2: 32
+
+# maxBlueH: 140
+# minBlueH: 100
+# maxBlueS: 255
+# minBlueS: 46
+# maxBlueV: 255
+# minBlueV: 32
+
 map_tf: "/vmap"
 base_tf: "/base_link"
 camera1_tf: "/camera1_link"
 camera2_tf: "/camera2_link"
+
+K_imu: 0.05
+K_wheel: 0.02
+K_r: 0.03
+K_thita: 0.03
 

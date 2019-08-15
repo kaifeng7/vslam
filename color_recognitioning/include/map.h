@@ -22,6 +22,8 @@ public:
     std::vector<MapPoint *> mpMapPoints;
     std::vector<KeyFrame *> mpKeyFrames;
 
+    std::vector<int> mMapPointFlags;//加入順序
+
     bool insertKeyFrame(KeyFrame* pKF);
     bool insertMapPoint(MapPoint* pMP,KeyFrame* pKF,const int &n);
     void eraseKeyFrame(KeyFrame* pKF);

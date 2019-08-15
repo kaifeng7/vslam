@@ -23,6 +23,8 @@ struct Card
     std::string code_id;
     int card_id;
     Eigen::Vector3d pose; //绝对位置
+    double thita;
+    double r;
     int code2card(const std::string &str)
     {
         int sum = 0;

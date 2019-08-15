@@ -52,6 +52,12 @@ def onVSlamData(msg):
       'x': msg.key_frame.camera_pose.position.x, 
       'y': msg.key_frame.camera_pose.position.y, 
       'z': msg.key_frame.camera_pose.position.z
+    },
+    'orientation': {
+      'x': msg.key_frame.camera_pose.orientation.x,
+      'y': msg.key_frame.camera_pose.orientation.y,
+      'z': msg.key_frame.camera_pose.orientation.z,
+      'w': msg.key_frame.camera_pose.orientation.w
     }
   }
   # for data in msg.key_frame:
@@ -72,6 +78,7 @@ def onVSlamData(msg):
     jsonData['marks'].append({
       'id': data.card_id,
       'code': data.code_id,
+      'current' :data.current,
       'location': {
         'x': data.card_pose.position.x,
         'y': data.card_pose.position.y, 

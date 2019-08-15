@@ -27,16 +27,16 @@ bool Map::insertKeyFrame(KeyFrame *pKF)
 }
 bool Map::insertMapPoint(MapPoint *pMP, KeyFrame *pKF, const int &n)
 {
-    if (mpMapPoints.at(pMP->mMapPointId) == nullptr)
+    if (mpMapPoints.at(pMP->mCard.card_id) == nullptr)
     {
-        mpMapPoints.at(pMP->mMapPointId) = pMP;
-        mpMapPoints.at(pMP->mMapPointId)->setRefKeyFrame(pKF, n);
-
+        mpMapPoints.at(pMP->mCard.card_id) = pMP;
+        mpMapPoints.at(pMP->mCard.card_id)->setRefKeyFrame(pKF, n);
+        
         return true;
     }
     else
     {
-        mpMapPoints.at(pMP->mMapPointId)->setRefKeyFrame(pKF, n);
+        mpMapPoints.at(pMP->mCard.card_id)->setRefKeyFrame(pKF, n);
         return false;
     }
 }
@@ -49,8 +49,8 @@ void Map::eraseKeyFrame(KeyFrame *pKF)
 
 void Map::eraseMapPoint(MapPoint *pMP)
 {
-    delete mpMapPoints.at(pMP->mMapPointId);
-    mpMapPoints.at(pMP->mMapPointId) = nullptr;
+    delete mpMapPoints.at(pMP->mCard.card_id);
+    mpMapPoints.at(pMP->mCard.card_id) = nullptr;
 }
 
 // void Map::getMapPoints()

@@ -80,6 +80,7 @@ add_executable(vslam_node src/card_detection.cpp
                           src/key_frame.cpp
                           src/map_point.cpp
                           src/map.cpp
+                          #src/debug_card.cpp
                           #src/g2o.cpp
                           )
 
